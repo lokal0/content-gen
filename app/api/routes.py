@@ -72,14 +72,27 @@ async def discover_competitors(request: dict):
     if not category and not business_name:
         return {"competitors": [], "error": "Provide business_category or business_name"}
 
+    # Extract city from full address (e.g. "Kollwitzstraße 71, 10435 Berlin, Germany" → "Berlin")
+    import re as _re
+    city = location
+    if location:
+        parts = [p.strip() for p in location.split(",")]
+        for part in parts:
+            cleaned = _re.sub(r"\d{4,5}\s*", "", part).strip()
+            if cleaned and not any(c.isdigit() for c in cleaned) and len(cleaned) > 2:
+                if cleaned not in ("Germany", "Deutschland", "DE"):
+                    city = cleaned
+                    break
+
     seed_keywords = []
-    if category and location:
-        seed_keywords.append(f"{category} {location}")
-        seed_keywords.append(f"best {category} {location}")
+    if category and city:
+        seed_keywords.append(f"{category} {city}")
+        seed_keywords.append(f"best {category} {city}")
+        seed_keywords.append(f"{category} near me {city}")
     elif category:
         seed_keywords.append(f"best {category}")
-    elif business_name and location:
-        seed_keywords.append(f"{business_name} {location}")
+    elif business_name and city:
+        seed_keywords.append(f"{business_name} {city}")
 
     skip_domains = {
         "google.com", "maps.google.com", "wikipedia.org", "en.wikipedia.org",
