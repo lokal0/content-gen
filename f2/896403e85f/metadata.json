@@ -1,0 +1,27 @@
+{
+  "cli_version": "0.5.6",
+  "checkpoint_id": "f2896403e85f",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "app/core/auth.py",
+    "app/main.py",
+    "config/deploy.yml"
+  ],
+  "sessions": [
+    {
+      "metadata": "/f2/896403e85f/0/metadata.json",
+      "transcript": "/f2/896403e85f/0/full.jsonl",
+      "content_hash": "/f2/896403e85f/0/content_hash.txt",
+      "prompt": "/f2/896403e85f/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 311,
+    "cache_creation_tokens": 154836,
+    "cache_read_tokens": 17252354,
+    "output_tokens": 47675,
+    "api_call_count": 217
+  }
+}
