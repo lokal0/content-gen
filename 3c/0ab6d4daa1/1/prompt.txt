@@ -1,0 +1,68 @@
+.
+
+---
+
+now here comes the fun part. which is building the content writer, agent.
+
+this content writer agent will build the most best performing content in terms of SEO and conversion. it will pay attention to schema.org, llms.txt, jsonld, robotos.txt etc.
+
+
+it will build the content inside and we will wrap the generated markdown with the extracted schema.org etc.
+
+
+did you get what I mean?
+
+---
+
+those are already instructed. 
+
+agent will be fed by those in the user prompt already.
+
+---
+
+not as another endpoint but as extension for the existing workflow
+
+---
+
+before that we need to do brain storming.
+
+I am thinking sth that is agentic  with seo search tools.
+
+tavily tools etc.
+
+
+let's brain storm about this.
+
+---
+
+agent receives two things.
+
+
+competitor top 5 and the original business btw
+
+---
+
+these products will be mostly local businesses so we can make it optimized for that
+
+---
+
+yes how it will look like.
+
+
+which tools will this agent have?
+
+---
+
+but we are giving the top 5 competitors already.
+
+do we still need to agentic search it
+
+---
+
+two tools is not enough where is seo api client.
+
+thats an edge we will use that service
+
+---
+
+but we have more functionalities chek the client
