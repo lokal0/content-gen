@@ -9,6 +9,8 @@ class AnalyzeRequest(BaseModel):
     business_name: str | None = None
     business_category: str | None = None
     business_location: str | None = None
+    business_rating: float | None = None
+    business_review_count: int | None = None
     competitor_urls: list[HttpUrl] = []
     skip_domain_enrichment: bool = False
 

@@ -228,6 +228,8 @@ async def _run_pipeline_task(
     business_name: str | None,
     business_category: str | None,
     business_location: str | None,
+    business_rating: float | None = None,
+    business_review_count: int | None = None,
     skip_domain_enrichment: bool = False,
 ) -> None:
     try:
@@ -278,6 +280,8 @@ async def _run_pipeline_task(
 
         from app.services.schema_generator import generate_article_schema, schemas_to_jsonld
 
+        request_rating = business_rating
+        request_review_count = business_review_count
         articles_out = []
         for a in agent_result.articles:
             schemas = generate_article_schema(
@@ -288,6 +292,8 @@ async def _run_pipeline_task(
                 business_name=result.business.name or "",
                 business_category=business_category,
                 business_location=business_location,
+                business_rating=request_rating,
+                business_review_count=request_review_count,
             )
             articles_out.append({
                 "cluster_id": a.cluster_id,
@@ -403,6 +409,8 @@ async def start_analysis(request: AnalyzeRequest):
         business_name=request.business_name,
         business_category=request.business_category,
         business_location=request.business_location,
+        business_rating=request.business_rating,
+        business_review_count=request.business_review_count,
         skip_domain_enrichment=request.skip_domain_enrichment,
     ))
 
