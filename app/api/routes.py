@@ -75,9 +75,10 @@ async def _run_pipeline_task(
             business_name=business_name,
             business_category=business_category,
             business_location=business_location,
+            job_id=job_id,
         )
 
-        agent_result = await run_content_agent(result)
+        agent_result = await run_content_agent(result, job_id=job_id)
 
         # Build response JSON
         competitors_out = [
@@ -233,6 +234,7 @@ async def get_analysis(job_id: str):
             "job_id": str(submission.id),
             "status": submission.status,
             "created_at": submission.created_at.isoformat(),
+            "progress": submission.progress,
         }
 
         if submission.status == "failed":

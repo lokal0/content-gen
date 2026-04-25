@@ -216,10 +216,16 @@ class AgentResult:
     total_output_tokens: int = 0
 
 
-async def run_content_agent(pipeline_result: PipelineResult) -> AgentResult:
+async def run_content_agent(pipeline_result: PipelineResult, job_id: "uuid.UUID | None" = None) -> AgentResult:
+    import uuid as _uuid
+    from app.services.progress import update_progress, update_agent_progress
+
     client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
     system_prompt = _build_system_prompt(pipeline_result)
     agent_result = AgentResult()
+
+    if job_id:
+        await update_progress(job_id, "agent_researching", "Agent starting research")
 
     messages = [
         {
@@ -251,9 +257,13 @@ async def run_content_agent(pipeline_result: PipelineResult) -> AgentResult:
 
         if response.stop_reason == "end_turn":
             logger.info("Agent finished after %d iterations", iteration + 1)
+            if job_id:
+                await update_progress(job_id, "agent_writing", f"Finished after {iteration + 1} iterations")
             break
 
         if response.stop_reason == "pause_turn":
+            if job_id:
+                await update_agent_progress(job_id, iteration + 1)
             messages = [
                 {"role": "user", "content": messages[0]["content"]},
                 {"role": "assistant", "content": response.content},
@@ -269,6 +279,12 @@ async def run_content_agent(pipeline_result: PipelineResult) -> AgentResult:
         tool_results = []
         for tool in tool_use_blocks:
             logger.info("Calling tool: %s(%s)", tool.name, json.dumps(tool.input)[:100])
+            if job_id:
+                await update_agent_progress(
+                    job_id, iteration + 1,
+                    tool_name=tool.name,
+                    tool_input_preview=json.dumps(tool.input)[:80],
+                )
             result = await _execute_tool(tool.name, tool.input)
             agent_result.tool_calls.append({
                 "name": tool.name,

@@ -189,14 +189,22 @@ async def run_pipeline(
     business_name: str | None = None,
     business_category: str | None = None,
     business_location: str | None = None,
+    job_id: "uuid.UUID | None" = None,
 ) -> PipelineResult:
+    from app.services.progress import update_progress
+    import uuid as _uuid
+
+    async def progress(stage: str, detail: str | None = None):
+        if job_id:
+            await update_progress(job_id, stage, detail)
+
     business = BusinessProfile(name=business_name)
     if business_url:
         business.url = business_url
         business.domain = _extract_domain(business_url)
 
-    # Discover competitors if none provided
     if not competitor_urls:
+        await progress("discovering_competitors", f"Searching for competitors of {business_name or 'business'}")
         competitor_urls = await _discover_competitors(
             business_name=business_name,
             business_category=business_category,
@@ -204,14 +212,16 @@ async def run_pipeline(
         )
         if not competitor_urls:
             raise ValueError("No competitor URLs provided and auto-discovery found none. Provide at least one competitor URL.")
+        await progress("discovering_competitors", f"Found {len(competitor_urls)} competitors")
 
     profiles = [
         CompetitorProfile(url=url, domain=_extract_domain(url))
         for url in competitor_urls
     ]
 
-    # Phase 1a: Crawl competitors + gather SEO data for business & competitors in parallel
-    logger.info("Phase 1: Crawling competitors and gathering SEO data")
+    await progress("crawling", f"Crawling {len(competitor_urls)} competitor websites")
+    await progress("gathering_seo_data", f"Fetching SEO data for {len(profiles)} domains")
+
     gather_tasks = [
         crawl_all_competitors(competitor_urls),
         _gather_competitor_data(profiles),
@@ -222,7 +232,7 @@ async def run_pipeline(
     results = await asyncio.gather(*gather_tasks)
     crawl_results = results[0]
 
-    # Phase 1b: Extract keywords from crawled content
+    await progress("extracting_keywords", "Extracting keywords from crawled content")
     extracted = extract_all_keywords(crawl_results)
     for cr in crawl_results:
         for profile in profiles:
@@ -234,7 +244,6 @@ async def run_pipeline(
                 ]
                 break
 
-    # Phase 1c: Merge and dedupe all keywords
     all_keywords_set: set[str] = set()
     for profile in profiles:
         all_keywords_set.update(profile.ranked_keywords)
@@ -242,20 +251,17 @@ async def run_pipeline(
             all_keywords_set.add(kw["keyword"].lower())
 
     all_keywords = list(all_keywords_set)
-    logger.info("Phase 1 complete: %d unique keywords across all competitors", len(all_keywords))
+    await progress("extracting_keywords", f"Found {len(all_keywords)} unique keywords")
 
-    # Phase 1d: Enrich with real metrics
-    logger.info("Enriching %d keywords with search volume/difficulty", len(all_keywords))
+    await progress("enriching_keywords", f"Enriching {len(all_keywords)} keywords with search metrics")
     keyword_metrics = await _enrich_keywords(all_keywords)
-    logger.info("Got metrics for %d keywords", len(keyword_metrics))
+    await progress("enriching_keywords", f"Got metrics for {len(keyword_metrics)} keywords")
 
-    # Phase 1e: Classify keyword intent with Pioneer GLiNER2
-    logger.info("Phase 1e: Classifying keyword intent with Pioneer")
+    await progress("classifying_intent", f"Classifying {len(all_keywords)} keywords with Pioneer GLiNER2")
     keyword_intents = await classify_keywords(all_keywords)
-    logger.info("Classified %d keywords by intent", len(keyword_intents))
+    await progress("classifying_intent", f"Classified {len(keyword_intents)} keywords by intent")
 
-    # Phase 2: Topic clustering
-    logger.info("Phase 2: Building topic clusters")
+    await progress("embedding_keywords", f"Embedding {len(all_keywords)} keywords with Gemini")
     keywords_to_cluster = [kw for kw in all_keywords if kw in keyword_metrics]
     competitor_keywords = {p.url: p.ranked_keywords for p in profiles}
 
@@ -267,7 +273,7 @@ async def run_pipeline(
         business_keywords=business.ranked_keywords,
         min_cluster_size=3,
     )
-    logger.info("Phase 2 complete: %d topic clusters", len(topic_clusters))
+    await progress("clustering", f"Found {len(topic_clusters)} topic clusters")
 
     return PipelineResult(
         business=business,
