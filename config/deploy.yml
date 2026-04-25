@@ -27,6 +27,7 @@ builder:
 env:
   clear:
     PORT: "8000"
+    SEO_API_URL: "http://seo-api:3000"
   secret:
     - DATABASE_URL
     - TAVILY_API_KEY
