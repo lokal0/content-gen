@@ -83,7 +83,7 @@ async def discover_competitors(request: dict):
 
     # Only skip domains that can never be a direct competitor
     skip_domains = {
-        "google.com", "maps.google.com", "wikipedia.org",
+        "google.com", "maps.google.com", "wikipedia.org", "en.wikipedia.org",
         "reddit.com", "quora.com", "twitter.com", "x.com",
         "linkedin.com", "pinterest.com", "tiktok.com",
         "youtube.com", "facebook.com", "instagram.com",
