@@ -276,8 +276,20 @@ async def _run_pipeline_task(
             for c in result.topic_clusters[:20]
         ]
 
-        articles_out = [
-            {
+        from app.services.schema_generator import generate_article_schema, schemas_to_jsonld
+
+        articles_out = []
+        for a in agent_result.articles:
+            schemas = generate_article_schema(
+                article_title=a.meta_title or a.target_keyword,
+                article_description=a.meta_description or "",
+                article_url="",
+                target_keyword=a.target_keyword,
+                business_name=result.business.name or "",
+                business_category=business_category,
+                business_location=business_location,
+            )
+            articles_out.append({
                 "cluster_id": a.cluster_id,
                 "target_keyword": a.target_keyword,
                 "supporting_keywords": a.supporting_keywords,
@@ -287,9 +299,8 @@ async def _run_pipeline_task(
                 "content_type": a.content_type,
                 "competitive_angle": a.competitive_angle,
                 "article_markdown": a.article_markdown,
-            }
-            for a in agent_result.articles
-        ]
+                "schema_jsonld": schemas,
+            })
 
         content_out = {
             "articles": articles_out,
