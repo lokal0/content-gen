@@ -81,18 +81,19 @@ async def discover_competitors(request: dict):
     elif business_name and location:
         seed_keywords.append(f"{business_name} {location}")
 
-    # Only skip domains that can never be a direct competitor
     skip_domains = {
         "google.com", "maps.google.com", "wikipedia.org", "en.wikipedia.org",
         "reddit.com", "quora.com", "twitter.com", "x.com",
         "linkedin.com", "pinterest.com", "tiktok.com",
         "youtube.com", "facebook.com", "instagram.com",
         "amazon.com", "ebay.com",
+        "cylex.de", "hotfrog.de", "gelbeseiten.de",
+        "11880.com", "branchenbuch.meinestadt.de",
     }
-    # Platforms where the business should be visible (returned separately)
     platform_domains = {
-        "yelp.com", "yelp.de", "tripadvisor.com", "treatwell.de", "treatwell.com",
-        "booksy.com", "fresha.com", "squareup.com", "jameda.de",
+        "yelp.com", "yelp.de", "m.yelp.com", "tripadvisor.com", "treatwell.de",
+        "treatwell.com", "booksy.com", "fresha.com", "squareup.com", "jameda.de",
+        "wheree.com",
     }
     biz_name_lower = (business_name or "").lower()
 
@@ -118,10 +119,13 @@ async def discover_competitors(request: dict):
                 domain = domain[4:]
             if domain in skip_domains:
                 continue
-            if biz_name_lower and biz_name_lower.replace(" ", "") in domain.replace(".", ""):
+            if any(domain.endswith(f".{p}") for p in skip_domains | platform_domains):
+                continue
+            if biz_name_lower and biz_name_lower.replace(" ", "") in domain.replace(".", "").replace("-", ""):
                 continue
 
-            bucket = "platforms" if domain in platform_domains else "competitors"
+            is_platform = domain in platform_domains
+            bucket = "platforms" if is_platform else "competitors"
             target = seen_domains if bucket == "competitors" else seen_platforms
 
             if domain not in target:
@@ -136,7 +140,7 @@ async def discover_competitors(request: dict):
             target[domain]["serp_appearances"] += 1
             target[domain]["best_rank"] = min(target[domain]["best_rank"], hit.rank)
 
-    ranked = sorted(seen_domains.values(), key=lambda x: (-x["serp_appearances"], x["best_rank"]))
+    ranked = sorted(seen_domains.values(), key=lambda x: (x["best_rank"], -x["serp_appearances"]))
     top5 = ranked[:5]
 
     # Fetch domain overviews in parallel
