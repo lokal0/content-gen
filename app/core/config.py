@@ -8,6 +8,8 @@ class Settings(BaseSettings):
     tavily_crawl_depth: int = 3
     tavily_max_pages: int = 20
     seo_api_url: str = "http://localhost:3000"
+    seo_api_token: str = ""
+    api_bearer_token: str = ""
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

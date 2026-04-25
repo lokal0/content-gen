@@ -1,9 +1,10 @@
 from contextlib import asynccontextmanager
 
 import nltk
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 
 from app.api.routes import router
+from app.core.auth import verify_bearer_token
 from app.core.database import engine
 from app.models.tables import Base
 
@@ -18,5 +19,5 @@ async def lifespan(app: FastAPI):
     await engine.dispose()
 
 
-app = FastAPI(title="Content Gen - Competitor Analysis Engine", lifespan=lifespan)
+app = FastAPI(title="Content Gen - Competitor Analysis Engine", lifespan=lifespan, dependencies=[Depends(verify_bearer_token)])
 app.include_router(router, prefix="/api/v1")

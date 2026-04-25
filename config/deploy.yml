@@ -31,3 +31,5 @@ env:
   secret:
     - DATABASE_URL
     - TAVILY_API_KEY
+    - SEO_API_TOKEN
+    - API_BEARER_TOKEN
