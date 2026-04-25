@@ -128,59 +128,52 @@ async def _discover_competitors(
     business_location: str | None,
     limit: int = 5,
 ) -> list[str]:
-    """Use Tavily search to find competitor website URLs when none are provided."""
-    from tavily import TavilyClient
-    from app.core.config import settings
-
-    if not settings.tavily_api_key:
-        return []
-
-    parts = []
-    if business_category:
-        parts.append(f"best {business_category}")
-    elif business_name:
-        parts.append(f"businesses similar to {business_name}")
+    """Find competitors by checking who ranks for seed keywords via DataForSEO SERP."""
+    seed_keywords = []
+    if business_category and business_location:
+        seed_keywords.append(f"{business_category} {business_location}")
+        seed_keywords.append(f"best {business_category} {business_location}")
+        seed_keywords.append(f"{business_category} near me {business_location}")
+    elif business_category:
+        seed_keywords.append(f"best {business_category}")
+    elif business_name and business_location:
+        seed_keywords.append(f"{business_name} {business_location}")
     else:
         return []
 
-    if business_location:
-        parts.append(f"in {business_location}")
+    logger.info("Discovering competitors via SERP for seeds: %s", seed_keywords)
 
-    query = " ".join(parts) + " website"
-    logger.info("Discovering competitors via Tavily: %s", query)
+    skip_domains = {
+        "google.com", "yelp.com", "yelp.de", "tripadvisor.com", "facebook.com",
+        "instagram.com", "maps.google.com", "wikipedia.org", "youtube.com",
+        "twitter.com", "x.com", "linkedin.com", "pinterest.com", "tiktok.com",
+        "amazon.com", "ebay.com", "treatwell.de", "treatwell.com",
+        "booksy.com", "fresha.com", "squareup.com",
+    }
+    biz_name_lower = (business_name or "").lower()
 
-    try:
-        client = TavilyClient(api_key=settings.tavily_api_key)
-        loop = asyncio.get_event_loop()
-        response = await loop.run_in_executor(
-            None,
-            lambda: client.search(query=query, max_results=limit * 2, search_depth="basic"),
-        )
+    seen_domains: dict[str, int] = {}
 
-        urls = []
-        seen_domains = set()
-        skip_domains = {"google.com", "yelp.com", "tripadvisor.com", "facebook.com", "instagram.com", "maps.google.com", "wikipedia.org"}
-        biz_domain = _extract_domain(f"https://{business_name}") if business_name else ""
+    for keyword in seed_keywords:
+        try:
+            serp_results = await seo_client.keyword_serp(keyword)
+            for hit in serp_results:
+                domain = hit.domain
+                if not domain:
+                    continue
+                if domain in skip_domains:
+                    continue
+                if biz_name_lower and biz_name_lower.replace(" ", "") in domain.replace(".", ""):
+                    continue
+                seen_domains[domain] = seen_domains.get(domain, 0) + 1
+        except Exception as e:
+            logger.warning("SERP lookup failed for %r: %s", keyword, e)
 
-        for r in response.get("results", []):
-            url = r.get("url", "")
-            if not url:
-                continue
-            domain = _extract_domain(url)
-            if domain in seen_domains or domain in skip_domains:
-                continue
-            if biz_domain and domain == biz_domain:
-                continue
-            seen_domains.add(domain)
-            urls.append(f"https://{domain}")
-            if len(urls) >= limit:
-                break
+    ranked = sorted(seen_domains.items(), key=lambda x: x[1], reverse=True)
+    urls = [f"https://{domain}" for domain, _ in ranked[:limit]]
 
-        logger.info("Discovered %d competitor URLs: %s", len(urls), urls)
-        return urls
-    except Exception as e:
-        logger.warning("Competitor discovery failed: %s", e)
-        return []
+    logger.info("Discovered %d competitors from SERP: %s", len(urls), urls)
+    return urls
 
 
 async def run_pipeline(
