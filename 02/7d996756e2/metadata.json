@@ -1,0 +1,25 @@
+{
+  "cli_version": "0.5.6",
+  "checkpoint_id": "027d996756e2",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "app/services/pipeline.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/02/7d996756e2/0/metadata.json",
+      "transcript": "/02/7d996756e2/0/full.jsonl",
+      "content_hash": "/02/7d996756e2/0/content_hash.txt",
+      "prompt": "/02/7d996756e2/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 853,
+    "cache_creation_tokens": 2460138,
+    "cache_read_tokens": 71245697,
+    "output_tokens": 101171,
+    "api_call_count": 420
+  }
+}
