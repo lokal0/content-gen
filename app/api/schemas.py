@@ -10,6 +10,7 @@ class AnalyzeRequest(BaseModel):
     business_category: str | None = None
     business_location: str | None = None
     competitor_urls: list[HttpUrl] = []
+    skip_domain_enrichment: bool = False
 
     @field_validator("competitor_urls")
     @classmethod

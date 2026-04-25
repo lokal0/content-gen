@@ -229,6 +229,7 @@ async def _run_pipeline_task(
     business_name: str | None,
     business_category: str | None,
     business_location: str | None,
+    skip_domain_enrichment: bool = False,
 ) -> None:
     try:
         result = await run_pipeline(
@@ -237,6 +238,7 @@ async def _run_pipeline_task(
             business_name=business_name,
             business_category=business_category,
             business_location=business_location,
+            skip_domain_enrichment=skip_domain_enrichment,
             job_id=job_id,
         )
 
@@ -391,6 +393,7 @@ async def start_analysis(request: AnalyzeRequest):
         business_name=request.business_name,
         business_category=request.business_category,
         business_location=request.business_location,
+        skip_domain_enrichment=request.skip_domain_enrichment,
     ))
 
     return {

@@ -168,6 +168,7 @@ async def run_pipeline(
     business_category: str | None = None,
     business_location: str | None = None,
     job_id: "uuid.UUID | None" = None,
+    skip_domain_enrichment: bool = False,
 ) -> PipelineResult:
     from app.services.progress import update_progress
     import uuid as _uuid
@@ -198,14 +199,15 @@ async def run_pipeline(
     ]
 
     await progress("crawling", f"Crawling {len(competitor_urls)} competitor websites")
-    await progress("gathering_seo_data", f"Fetching SEO data for {len(profiles)} domains")
 
-    gather_tasks = [
-        crawl_all_competitors(competitor_urls),
-        _gather_competitor_data(profiles),
-    ]
-    if business.domain:
-        gather_tasks.append(_gather_business_data(business))
+    gather_tasks = [crawl_all_competitors(competitor_urls)]
+    if not skip_domain_enrichment:
+        await progress("gathering_seo_data", f"Fetching SEO data for {len(profiles)} domains")
+        gather_tasks.append(_gather_competitor_data(profiles))
+        if business.domain:
+            gather_tasks.append(_gather_business_data(business))
+    else:
+        await progress("gathering_seo_data", "Using cached SEO data from audit")
 
     results = await asyncio.gather(*gather_tasks)
     crawl_results = results[0]
