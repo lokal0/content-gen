@@ -81,16 +81,23 @@ async def discover_competitors(request: dict):
     elif business_name and location:
         seed_keywords.append(f"{business_name} {location}")
 
+    # Only skip domains that can never be a direct competitor
     skip_domains = {
-        "google.com", "yelp.com", "yelp.de", "tripadvisor.com", "facebook.com",
-        "instagram.com", "maps.google.com", "wikipedia.org", "youtube.com",
-        "twitter.com", "x.com", "linkedin.com", "pinterest.com", "tiktok.com",
-        "amazon.com", "ebay.com", "treatwell.de", "treatwell.com",
-        "booksy.com", "fresha.com", "squareup.com", "reddit.com",
+        "google.com", "maps.google.com", "wikipedia.org",
+        "reddit.com", "quora.com", "twitter.com", "x.com",
+        "linkedin.com", "pinterest.com", "tiktok.com",
+        "youtube.com", "facebook.com", "instagram.com",
+        "amazon.com", "ebay.com",
+    }
+    # Platforms where the business should be visible (returned separately)
+    platform_domains = {
+        "yelp.com", "yelp.de", "tripadvisor.com", "treatwell.de", "treatwell.com",
+        "booksy.com", "fresha.com", "squareup.com", "jameda.de",
     }
     biz_name_lower = (business_name or "").lower()
 
     seen_domains: dict[str, dict] = {}
+    seen_platforms: dict[str, dict] = {}
 
     # Fetch all SERP results in parallel
     async def fetch_serp(keyword: str):
@@ -105,22 +112,29 @@ async def discover_competitors(request: dict):
     for serp_results in serp_results_list:
         for hit in serp_results:
             domain = hit.domain
-            if not domain or domain in skip_domains:
+            if not domain:
                 continue
             if domain.startswith("www."):
                 domain = domain[4:]
+            if domain in skip_domains:
+                continue
             if biz_name_lower and biz_name_lower.replace(" ", "") in domain.replace(".", ""):
                 continue
-            if domain not in seen_domains:
-                seen_domains[domain] = {
+
+            bucket = "platforms" if domain in platform_domains else "competitors"
+            target = seen_domains if bucket == "competitors" else seen_platforms
+
+            if domain not in target:
+                target[domain] = {
                     "domain": domain,
                     "url": f"https://{domain}",
                     "serp_appearances": 0,
                     "best_rank": 100,
                     "sample_title": hit.title,
+                    "type": bucket,
                 }
-            seen_domains[domain]["serp_appearances"] += 1
-            seen_domains[domain]["best_rank"] = min(seen_domains[domain]["best_rank"], hit.rank)
+            target[domain]["serp_appearances"] += 1
+            target[domain]["best_rank"] = min(target[domain]["best_rank"], hit.rank)
 
     ranked = sorted(seen_domains.values(), key=lambda x: (-x["serp_appearances"], x["best_rank"]))
     top5 = ranked[:5]
@@ -138,7 +152,13 @@ async def discover_competitors(request: dict):
 
     competitors = await asyncio.gather(*[enrich(comp) for comp in top5])
 
-    return {"competitors": competitors, "seed_keywords": seed_keywords}
+    platforms = sorted(seen_platforms.values(), key=lambda x: (-x["serp_appearances"], x["best_rank"]))
+
+    return {
+        "competitors": competitors,
+        "platforms": [{"domain": p["domain"], "url": p["url"], "rank": p["best_rank"]} for p in platforms],
+        "seed_keywords": seed_keywords,
+    }
 
 
 async def _run_pipeline_task(
