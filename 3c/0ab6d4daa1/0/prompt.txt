@@ -131,3 +131,7 @@ can't we use gemini embeddings 2.0 ?
 ---
 
 i will give you the key too
+
+---
+
+use it from .env i will add
