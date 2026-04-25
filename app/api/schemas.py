@@ -52,6 +52,20 @@ class TopicClusterOut(BaseModel):
     keyword_metrics: list[dict] = []
 
 
+class AgentToolCallOut(BaseModel):
+    name: str
+    input: dict
+    output_preview: str = ""
+
+
+class ContentAgentOut(BaseModel):
+    full_response: str = ""
+    thinking_blocks: list[str] = []
+    tool_calls: list[AgentToolCallOut] = []
+    total_input_tokens: int = 0
+    total_output_tokens: int = 0
+
+
 class AnalyzeResponse(BaseModel):
     submission_id: uuid.UUID
     status: str
@@ -60,3 +74,4 @@ class AnalyzeResponse(BaseModel):
     total_clusters: int = 0
     competitors: list[CompetitorOut]
     topic_clusters: list[TopicClusterOut] = []
+    content: ContentAgentOut | None = None

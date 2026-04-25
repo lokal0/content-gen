@@ -2,14 +2,17 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.schemas import (
+    AgentToolCallOut,
     AnalyzeRequest,
     AnalyzeResponse,
     CompetitorOut,
+    ContentAgentOut,
     KeywordOut,
     TopicClusterOut,
 )
 from app.core.database import get_db
 from app.models.tables import Competitor, CrawledPage, Keyword, Submission
+from app.services.content_agent import run_content_agent
 from app.services.pipeline import run_pipeline
 
 router = APIRouter()
@@ -54,6 +57,9 @@ async def analyze_competitors(request: AnalyzeRequest, db: AsyncSession = Depend
             )
             db.add(keyword_record)
 
+    # Phase 4-5: Agent produces content briefs and writes articles
+    agent_result = await run_content_agent(result)
+
     submission.status = "completed"
     await db.commit()
 
@@ -90,6 +96,17 @@ async def analyze_competitors(request: AnalyzeRequest, db: AsyncSession = Depend
         for c in result.topic_clusters[:20]
     ]
 
+    content_out = ContentAgentOut(
+        full_response=agent_result.full_response,
+        thinking_blocks=agent_result.thinking_blocks,
+        tool_calls=[
+            AgentToolCallOut(name=tc["name"], input=tc["input"], output_preview=tc["output_preview"])
+            for tc in agent_result.tool_calls
+        ],
+        total_input_tokens=agent_result.total_input_tokens,
+        total_output_tokens=agent_result.total_output_tokens,
+    )
+
     return AnalyzeResponse(
         submission_id=submission.id,
         status=submission.status,
@@ -98,4 +115,5 @@ async def analyze_competitors(request: AnalyzeRequest, db: AsyncSession = Depend
         total_clusters=result.total_clusters,
         competitors=competitors_out,
         topic_clusters=clusters_out,
+        content=content_out,
     )
