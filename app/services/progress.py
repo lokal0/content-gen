@@ -1,9 +1,11 @@
+import json
 import logging
 import uuid
 from datetime import datetime, timezone
 
+from sqlalchemy import text
+
 from app.core.database import async_session
-from app.models.tables import Submission
 
 logger = logging.getLogger(__name__)
 
@@ -21,18 +23,17 @@ STAGES = [
     "completed",
 ]
 
+_progress_cache: dict[str, dict] = {}
+
 
 async def update_progress(
     job_id: uuid.UUID,
     stage: str,
     detail: str | None = None,
 ) -> None:
-    async with async_session() as db:
-        submission = await db.get(Submission, job_id)
-        if not submission:
-            return
-
-        progress = submission.progress or {"stages": [], "current_stage": None}
+    try:
+        key = str(job_id)
+        progress = _progress_cache.get(key, {"stages": []})
         stages_done = progress.get("stages", [])
         now = datetime.now(timezone.utc).isoformat()
 
@@ -42,6 +43,11 @@ async def update_progress(
                 "started_at": now,
                 "detail": detail,
             })
+        else:
+            for s in stages_done:
+                if s["name"] == stage:
+                    s["detail"] = detail
+                    break
 
         progress["stages"] = stages_done
         progress["current_stage"] = stage
@@ -49,9 +55,18 @@ async def update_progress(
         progress["stage_index"] = STAGES.index(stage) if stage in STAGES else -1
         progress["total_stages"] = len(STAGES)
 
-        submission.progress = progress
-        await db.commit()
+        _progress_cache[key] = progress
+
+        async with async_session() as db:
+            await db.execute(
+                text("UPDATE submissions SET progress = :progress WHERE id = :id"),
+                {"progress": json.dumps(progress), "id": str(job_id)},
+            )
+            await db.commit()
+
         logger.info("Job %s: %s%s", job_id, stage, f" — {detail}" if detail else "")
+    except Exception as e:
+        logger.warning("Progress update failed for %s: %s", job_id, e)
 
 
 async def update_agent_progress(
