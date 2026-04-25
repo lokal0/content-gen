@@ -72,6 +72,26 @@ async def discover_competitors(request: dict):
     if not category and not business_name:
         return {"competitors": [], "error": "Provide business_category or business_name"}
 
+    # Detect country from location for correct SERP results
+    COUNTRY_CODES = {
+        "germany": (2276, "de"), "deutschland": (2276, "de"),
+        "austria": (2040, "de"), "österreich": (2040, "de"),
+        "switzerland": (2756, "de"), "schweiz": (2756, "de"),
+        "netherlands": (2528, "nl"), "france": (2250, "fr"),
+        "spain": (2724, "es"), "italy": (2380, "it"),
+        "united kingdom": (2826, "en"), "uk": (2826, "en"),
+        "united states": (2840, "en"), "usa": (2840, "en"),
+        "turkey": (2792, "tr"), "türkiye": (2792, "tr"),
+    }
+    location_code = 2840
+    language_code = "en"
+    location_lower = location.lower()
+    for country, (code, lang) in COUNTRY_CODES.items():
+        if country in location_lower:
+            location_code = code
+            language_code = lang
+            break
+
     # Extract city from full address (e.g. "Kollwitzstraße 71, 10435 Berlin, Germany" → "Berlin")
     import re as _re
     city = location
@@ -90,7 +110,7 @@ async def discover_competitors(request: dict):
     discovered_keywords = []
 
     try:
-        kw_results = await seo_client.keyword_research([initial_seed])
+        kw_results = await seo_client.keyword_research([initial_seed], location_code=location_code, language_code=language_code)
         # Pick top keywords by volume that include the city or category
         city_lower = city.lower() if city else ""
         cat_lower = category.lower() if category else ""
@@ -139,7 +159,7 @@ async def discover_competitors(request: dict):
     # Fetch all SERP results in parallel
     async def fetch_serp(keyword: str):
         try:
-            return await seo_client.keyword_serp(keyword)
+            return await seo_client.keyword_serp(keyword, location_code=location_code, language_code=language_code)
         except Exception as e:
             logger.warning("SERP lookup failed for %r: %s", keyword, e)
             return []
@@ -182,7 +202,7 @@ async def discover_competitors(request: dict):
     # Fetch domain overviews in parallel
     async def enrich(comp: dict):
         try:
-            overview = await seo_client.domain_overview(comp["domain"])
+            overview = await seo_client.domain_overview(comp["domain"], location_code=location_code, language_code=language_code)
             comp["organic_traffic"] = overview.organic_traffic
             comp["organic_keywords"] = overview.organic_keywords
         except Exception:
