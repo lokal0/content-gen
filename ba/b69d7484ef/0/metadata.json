@@ -1,0 +1,38 @@
+{
+  "cli_version": "0.5.6",
+  "checkpoint_id": "bab69d7484ef",
+  "session_id": "560d831f-4ad6-4aab-b7f2-14cd3fcb9ae2",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-25T14:45:25.177065Z",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "app/core/database.py",
+    "app/services/keyword_extractor.py"
+  ],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "284f3da3f4f6",
+  "token_usage": {
+    "input_tokens": 475,
+    "cache_creation_tokens": 1485820,
+    "cache_read_tokens": 47728046,
+    "output_tokens": 82259,
+    "api_call_count": 347
+  },
+  "session_metrics": {
+    "turn_count": 26
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-25T14:45:25.147973Z",
+    "agent_lines": 0,
+    "agent_removed": 1,
+    "human_added": 261,
+    "human_modified": 1,
+    "human_removed": 0,
+    "total_committed": 262,
+    "total_lines_changed": 329,
+    "agent_percentage": 0.303951367781155,
+    "metric_version": 2
+  }
+}
