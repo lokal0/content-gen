@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 MODEL = "claude-sonnet-4-6"
 MAX_TOKENS = 16000
-MAX_ITERATIONS = 25
+MAX_ITERATIONS = 15
 
 TOOLS = [
     {
@@ -159,6 +159,8 @@ For each of the top topic clusters, produce a detailed content brief and then wr
 1. Use `keyword_serp` to analyze the current top-ranking pages for the primary keyword
 2. Use `keyword_research` to find additional related keywords to target
 3. Use `tavily_search` to check for recent developments or angles competitors are missing
+
+**TOOL BUDGET: You have a limited budget. Use max 5 keyword_serp calls, max 2 keyword_research calls, and max 2 tavily_search calls total across ALL clusters. Be strategic — research the top 2-3 clusters deeply rather than all of them shallowly.**
 
 **Then produce for each cluster a SEPARATE, COMPLETE article including:**
 - Target keyword + supporting keywords

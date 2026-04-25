@@ -71,14 +71,6 @@ async def _gather_competitor_data(profiles: list[CompetitorProfile]) -> None:
         except Exception as e:
             logger.warning("domain_overview failed for %s: %s", profile.domain, e)
 
-        try:
-            suggestions = await seo_client.domain_suggestions(profile.domain)
-            for kw in suggestions:
-                profile.ranked_keywords.add(kw.get("keyword", "").lower())
-            logger.info("%s: %d total ranked keywords after suggestions", profile.domain, len(profile.ranked_keywords))
-        except Exception as e:
-            logger.warning("domain_suggestions failed for %s: %s", profile.domain, e)
-
     await asyncio.gather(*[fetch_one(p) for p in profiles])
 
 
@@ -93,13 +85,6 @@ async def _gather_business_data(business: BusinessProfile) -> None:
     except Exception as e:
         logger.warning("domain_overview failed for business %s: %s", business.domain, e)
 
-    try:
-        suggestions = await seo_client.domain_suggestions(business.domain)
-        for kw in suggestions:
-            business.ranked_keywords.add(kw.get("keyword", "").lower())
-        logger.info("Business %s: %d total ranked keywords", business.domain, len(business.ranked_keywords))
-    except Exception as e:
-        logger.warning("domain_suggestions failed for business %s: %s", business.domain, e)
 
 
 async def _enrich_keywords(keywords: list[str]) -> dict[str, dict]:
