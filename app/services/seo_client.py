@@ -1,3 +1,5 @@
+import hashlib
+import time
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -6,6 +8,26 @@ import httpx
 from app.core.config import settings
 
 _TIMEOUT = 60.0
+_CACHE: dict[str, tuple[float, Any]] = {}
+_CACHE_TTL = 86400  # 24 hours
+
+
+def _cache_key(func_name: str, **kwargs) -> str:
+    raw = f"{func_name}:{sorted(kwargs.items())}"
+    return hashlib.md5(raw.encode()).hexdigest()
+
+
+def _cache_get(key: str) -> Any | None:
+    if key in _CACHE:
+        ts, val = _CACHE[key]
+        if time.time() - ts < _CACHE_TTL:
+            return val
+        del _CACHE[key]
+    return None
+
+
+def _cache_set(key: str, val: Any):
+    _CACHE[key] = (time.time(), val)
 
 
 def _headers() -> dict[str, str]:
@@ -101,6 +123,11 @@ async def keyword_overview(
     location_code: int = 2840,
     language_code: str = "en",
 ) -> list[KeywordMetric]:
+    ck = _cache_key("keyword_overview", keywords=tuple(sorted(keywords)), location_code=location_code, language_code=language_code)
+    cached = _cache_get(ck)
+    if cached is not None:
+        return cached
+
     async with _client() as c:
         r = await c.post("/keywords/overview", json={
             "keywords": keywords,
@@ -108,7 +135,9 @@ async def keyword_overview(
             "languageCode": language_code,
         })
         r.raise_for_status()
-        return _parse_keywords(r.json().get("items", []))
+        result = _parse_keywords(r.json().get("items", []))
+        _cache_set(ck, result)
+        return result
 
 
 async def keyword_serp(
@@ -117,6 +146,11 @@ async def keyword_serp(
     language_code: str = "en",
     device: str = "desktop",
 ) -> list[SerpHit]:
+    ck = _cache_key("keyword_serp", keyword=keyword, location_code=location_code, language_code=language_code, device=device)
+    cached = _cache_get(ck)
+    if cached is not None:
+        return cached
+
     async with _client() as c:
         r = await c.post("/keywords/serp", json={
             "keyword": keyword,
@@ -126,7 +160,7 @@ async def keyword_serp(
         })
         r.raise_for_status()
         data = r.json()
-        return [
+        result = [
             SerpHit(
                 rank=i["rank"],
                 title=i["title"],
@@ -139,6 +173,8 @@ async def keyword_serp(
             )
             for i in data.get("items", [])
         ]
+        _cache_set(ck, result)
+        return result
 
 
 async def domain_overview(
@@ -147,6 +183,11 @@ async def domain_overview(
     location_code: int = 2840,
     language_code: str = "en",
 ) -> DomainOverview:
+    ck = _cache_key("domain_overview", domain=domain, include_subdomains=include_subdomains, location_code=location_code, language_code=language_code)
+    cached = _cache_get(ck)
+    if cached is not None:
+        return cached
+
     async with _client() as c:
         r = await c.post("/domain/overview", json={
             "domain": domain,
@@ -156,7 +197,7 @@ async def domain_overview(
         })
         r.raise_for_status()
         d = r.json()
-        return DomainOverview(
+        result = DomainOverview(
             domain=d["domain"],
             organic_traffic=d.get("organicTraffic"),
             organic_keywords=d.get("organicKeywords"),
@@ -164,6 +205,8 @@ async def domain_overview(
             keywords=d.get("keywords", []),
             pages=d.get("pages", []),
         )
+        _cache_set(ck, result)
+        return result
 
 
 async def domain_suggestions(
