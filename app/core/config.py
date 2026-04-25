@@ -11,9 +11,12 @@ class Settings(BaseSettings):
     model_config = {"env_file": ".env", "extra": "ignore"}
 
     @model_validator(mode="after")
-    def fix_db_scheme(self):
+    def fix_db_url(self):
         if self.database_url.startswith("postgresql://"):
             self.database_url = self.database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        self.database_url = self.database_url.replace("sslmode=require", "ssl=require")
+        self.database_url = self.database_url.replace("channel_binding=require", "")
+        self.database_url = self.database_url.rstrip("&?")
         return self
 
 
