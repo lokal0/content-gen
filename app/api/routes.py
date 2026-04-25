@@ -149,7 +149,7 @@ async def discover_competitors(request: dict):
     platform_domains = {
         "yelp.com", "yelp.de", "m.yelp.com", "tripadvisor.com", "treatwell.de",
         "treatwell.com", "booksy.com", "fresha.com", "squareup.com", "jameda.de",
-        "wheree.com",
+        "wheree.com", "mitvergnuegen.com",
     }
     biz_name_lower = (business_name or "").lower()
 
