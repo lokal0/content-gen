@@ -84,15 +84,38 @@ async def discover_competitors(request: dict):
                     city = cleaned
                     break
 
+    # Step 1: Use keyword_research to discover what people actually search
+    initial_seed = f"{category} {city}" if category and city else f"{business_name} {city}" if business_name and city else category or business_name
     seed_keywords = []
-    if category and city:
-        seed_keywords.append(f"{category} {city}")
-        seed_keywords.append(f"best {category} {city}")
-        seed_keywords.append(f"{category} near me {city}")
-    elif category:
-        seed_keywords.append(f"best {category}")
-    elif business_name and city:
-        seed_keywords.append(f"{business_name} {city}")
+    discovered_keywords = []
+
+    try:
+        kw_results = await seo_client.keyword_research([initial_seed])
+        # Pick top keywords by volume that include the city or category
+        city_lower = city.lower() if city else ""
+        cat_lower = category.lower() if category else ""
+        for kw in sorted(kw_results, key=lambda k: k.search_volume or 0, reverse=True):
+            kw_lower = kw.keyword.lower()
+            if city_lower and city_lower in kw_lower:
+                seed_keywords.append(kw.keyword)
+                discovered_keywords.append({"keyword": kw.keyword, "search_volume": kw.search_volume, "difficulty": kw.keyword_difficulty})
+            elif cat_lower and cat_lower in kw_lower:
+                seed_keywords.append(kw.keyword)
+                discovered_keywords.append({"keyword": kw.keyword, "search_volume": kw.search_volume, "difficulty": kw.keyword_difficulty})
+            if len(seed_keywords) >= 5:
+                break
+        logger.info("keyword_research returned %d seeds: %s", len(seed_keywords), seed_keywords)
+    except Exception as e:
+        logger.warning("keyword_research failed: %s, falling back to manual seeds", e)
+
+    # Fallback if keyword_research returned nothing useful
+    if not seed_keywords:
+        if category and city:
+            seed_keywords = [f"{category} {city}", f"best {category} {city}"]
+        elif business_name and city:
+            seed_keywords = [f"{business_name} {city}"]
+        else:
+            seed_keywords = [initial_seed]
 
     skip_domains = {
         "google.com", "maps.google.com", "wikipedia.org", "en.wikipedia.org",
@@ -175,6 +198,7 @@ async def discover_competitors(request: dict):
         "competitors": competitors,
         "platforms": [{"domain": p["domain"], "url": p["url"], "rank": p["best_rank"]} for p in platforms],
         "seed_keywords": seed_keywords,
+        "discovered_keywords": discovered_keywords,
     }
 
 
