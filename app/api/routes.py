@@ -214,9 +214,24 @@ async def _run_pipeline_task(
             for c in result.topic_clusters[:20]
         ]
 
+        articles_out = [
+            {
+                "cluster_id": a.cluster_id,
+                "target_keyword": a.target_keyword,
+                "supporting_keywords": a.supporting_keywords,
+                "search_intent": a.search_intent,
+                "meta_title": a.meta_title,
+                "meta_description": a.meta_description,
+                "content_type": a.content_type,
+                "competitive_angle": a.competitive_angle,
+                "article_markdown": a.article_markdown,
+            }
+            for a in agent_result.articles
+        ]
+
         content_out = {
+            "articles": articles_out,
             "full_response": agent_result.full_response,
-            "thinking_blocks": agent_result.thinking_blocks,
             "tool_calls": [
                 {"name": tc["name"], "input": tc["input"], "output_preview": tc["output_preview"]}
                 for tc in agent_result.tool_calls

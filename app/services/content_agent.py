@@ -160,36 +160,106 @@ For each of the top topic clusters, produce a detailed content brief and then wr
 2. Use `keyword_research` to find additional related keywords to target
 3. Use `tavily_search` to check for recent developments or angles competitors are missing
 
-**Then produce for each cluster:**
-A complete content brief followed by the full article in markdown, including:
+**Then produce for each cluster a SEPARATE, COMPLETE article including:**
 - Target keyword + supporting keywords
 - Search intent classification
 - Meta title (≤60 chars) and meta description (≤155 chars)
 - Full article with proper heading hierarchy (H1, H2, H3)
-- Target word count based on SERP analysis
 - Competitive angle (what {biz_name} does better than current top results)
-- Schema.org markup suggestions
-- Internal linking opportunities
 
-Write content from {biz_name}'s perspective. Position them as the solution. Focus on the top 3-5 clusters with the highest opportunity scores. Write content that is genuinely better and more comprehensive than what currently ranks."""
+Write content from {biz_name}'s perspective. Position them as the solution. Focus on the top 3-5 clusters with the highest opportunity scores.
+
+Clearly separate each article with a horizontal rule (---) and start each with a H1 heading. Write content that is genuinely better and more comprehensive than what currently ranks."""
 
 
 @dataclass
 class ContentPiece:
     cluster_id: int
-    content: str
-    thinking_steps: list[str] = field(default_factory=list)
-    tools_used: list[dict] = field(default_factory=list)
+    target_keyword: str
+    supporting_keywords: list[str] = field(default_factory=list)
+    search_intent: str = ""
+    meta_title: str = ""
+    meta_description: str = ""
+    content_type: str = ""
+    estimated_word_count: int = 0
+    competitive_angle: str = ""
+    article_markdown: str = ""
 
 
 @dataclass
 class AgentResult:
-    content_pieces: list[ContentPiece] = field(default_factory=list)
+    articles: list[ContentPiece] = field(default_factory=list)
     full_response: str = ""
     thinking_blocks: list[str] = field(default_factory=list)
     tool_calls: list[dict] = field(default_factory=list)
     total_input_tokens: int = 0
     total_output_tokens: int = 0
+
+
+ARTICLES_SCHEMA = {
+    "type": "json_schema",
+    "json_schema": {
+        "type": "object",
+        "properties": {
+            "articles": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "cluster_id": {"type": "integer"},
+                        "target_keyword": {"type": "string"},
+                        "supporting_keywords": {"type": "array", "items": {"type": "string"}},
+                        "search_intent": {"type": "string"},
+                        "meta_title": {"type": "string"},
+                        "meta_description": {"type": "string"},
+                        "content_type": {"type": "string"},
+                        "competitive_angle": {"type": "string"},
+                        "article_markdown": {"type": "string"},
+                    },
+                    "required": ["cluster_id", "target_keyword", "meta_title", "article_markdown"],
+                    "additionalProperties": False,
+                },
+            },
+        },
+        "required": ["articles"],
+        "additionalProperties": False,
+    },
+}
+
+
+async def _structure_articles(client: anthropic.AsyncAnthropic, raw_content: str) -> list[ContentPiece]:
+    response = await client.messages.create(
+        model=MODEL,
+        max_tokens=MAX_TOKENS,
+        output_config={"format": ARTICLES_SCHEMA},
+        messages=[
+            {
+                "role": "user",
+                "content": f"Extract and structure each article from this content into the required JSON format. Preserve all markdown content exactly.\n\n{raw_content}",
+            }
+        ],
+    )
+
+    text = next((b.text for b in response.content if b.type == "text"), "")
+    try:
+        data = json.loads(text)
+        return [
+            ContentPiece(
+                cluster_id=a.get("cluster_id", 0),
+                target_keyword=a.get("target_keyword", ""),
+                supporting_keywords=a.get("supporting_keywords", []),
+                search_intent=a.get("search_intent", ""),
+                meta_title=a.get("meta_title", ""),
+                meta_description=a.get("meta_description", ""),
+                content_type=a.get("content_type", ""),
+                competitive_angle=a.get("competitive_angle", ""),
+                article_markdown=a.get("article_markdown", ""),
+            )
+            for a in data.get("articles", [])
+        ]
+    except json.JSONDecodeError:
+        logger.error("Failed to parse structured articles output")
+        return []
 
 
 async def run_content_agent(pipeline_result: PipelineResult, job_id: "uuid.UUID | None" = None) -> AgentResult:
@@ -282,5 +352,12 @@ async def run_content_agent(pipeline_result: PipelineResult, job_id: "uuid.UUID 
         agent_result.total_input_tokens,
         agent_result.total_output_tokens,
     )
+
+    # Structure the raw content into separate articles
+    if agent_result.full_response:
+        if job_id:
+            await update_progress(job_id, "agent_writing", "Structuring articles...")
+        agent_result.articles = await _structure_articles(client, agent_result.full_response)
+        logger.info("Structured %d articles from agent output", len(agent_result.articles))
 
     return agent_result
