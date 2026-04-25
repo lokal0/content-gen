@@ -1,0 +1,56 @@
+bro btw can we push this to lokal0 domain
+
+---
+
+bro btw can we push this to lokal0 github
+
+---
+
+but we need to push it to lokal0 oragnization
+
+---
+
+perfect does entire enabled there?
+
+---
+
+okay perfect.
+
+
+now is this api live and working.
+
+should i give you my hetzner api keys to deploy?
+
+
+we will use kamal v2 for deployment
+
+---
+
+no problem i will rotate later. let's focus on building this feature out properly
+
+---
+
+there you go
+
+
+REDACTED
+
+---
+
+you will setup everything. you will use ghcr as well.
+
+domain is not defined yet but we can say openhook.dev for now to test then we can change
+
+---
+
+you will setup everything. you will use ghcr as well.
+
+domain is not defined yet but we can say openhook.dev for now to test then we can change
+
+here is the neon 
+
+DATABASE_URL='postgresql://neondb_owner:npg_9pMXPbSHg0Ia@ep-misty-sea-al9m9q33-pooler.c-3.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require'
+
+---
+
+go check web. or discover oktai project. that uses kamal perfectly
