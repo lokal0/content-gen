@@ -1,0 +1,246 @@
+bro btw can we push this to lokal0 domain
+
+---
+
+bro btw can we push this to lokal0 github
+
+---
+
+but we need to push it to lokal0 oragnization
+
+---
+
+perfect does entire enabled there?
+
+---
+
+okay perfect.
+
+
+now is this api live and working.
+
+should i give you my hetzner api keys to deploy?
+
+
+we will use kamal v2 for deployment
+
+---
+
+no problem i will rotate later. let's focus on building this feature out properly
+
+---
+
+there you go
+
+
+REDACTED
+
+---
+
+you will setup everything. you will use ghcr as well.
+
+domain is not defined yet but we can say openhook.dev for now to test then we can change
+
+---
+
+you will setup everything. you will use ghcr as well.
+
+domain is not defined yet but we can say openhook.dev for now to test then we can change
+
+here is the neon 
+
+DATABASE_URL='postgresql://neondb_owner:npg_9pMXPbSHg0Ia@ep-misty-sea-al9m9q33-pooler.c-3.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require'
+
+---
+
+go check web. or discover oktai project. that uses kamal perfectly
+
+---
+
+btw can we involve this seo-api in the docker image
+
+we build?
+
+---
+
+do the option 2.
+
+---
+
+let's define one secret that validates the request on server side?
+
+---
+
+perfect.
+
+
+now you want to do refactor or make implementation cleaner?
+
+---
+
+let's write client for seo-api bc we will use this as tool for the agent that will craft the content. 
+
+
+i am still thinking the agent part
+
+---
+
+now you have the full picture. how this agent would look like
+
+---
+
+but if we do single loop.
+
+it will not have opportunity to search best performing keywords
+
+---
+
+how sota is this?
+
+---
+
+how it would look like?
+
+---
+
+then eventually it must use these to write best content right?
+
+---
+
+okay do we have foundation for that?
+
+---
+
+okay but do we have vector db?
+
+---
+
+let's do it like that if we can do it in hetzner machine too?
+
+---
+
+yes i do.
+
+
+i can give antrophic api key what will sentence transformer work in hetzner machine
+
+---
+
+can't we use gemini embeddings 2.0 ?
+
+---
+
+i will give you the key too
+
+---
+
+use it from .env i will add
+
+---
+
+how did you configure the agent
+
+---
+
+it must use thinking blocks and tools heavily
+
+---
+
+here is my gemini:
+
+REDACTED
+
+antrophic REDACTED
+
+---
+
+let's test.
+
+
+let's test for local service url.
+
+
+find something in berlin like haircut man
+
+---
+
+yes sir
+
+---
+
+we added auto finetuning layer can you check that
+
+---
+
+bro i am testing end to end can you observe logs
+
+---
+
+bro if you read the full codebase and product what would you say.
+
+
+i think somethings doesn't make sense.
+
+
+like ranking in the frontend. doesn't make sense.
+
+
+
+how does it search for competitors.
+
+
+is it search based?
+
+or keyword based. based on what?
+
+---
+
+but if business doesn't have website
+
+---
+
+imagine they only have location
+
+---
+
+but once they submit their google maps we extract the location and data through google maps api
+
+---
+
+do you have frontend codebase access?
+
+---
+
+go explore and see the full flow
+
+---
+
+yes but how do you think full flow should be?
+
+---
+
+let's design this end to end.
+
+
+let's first fixing issues from frontend
+
+---
+
+no man i mean the flow wise that you've crafted
+
+---
+
+draw the execution flow now.
+
+i want to see data pipeline and dependencies.
+
+
+because we will improve the flow and ux on frontend more.
+
+---
+
+is this frontend weakness fixed?
+
+---
+
+yes let's connect it end to end
