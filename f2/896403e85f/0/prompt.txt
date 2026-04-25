@@ -68,3 +68,17 @@ do the option 2.
 ---
 
 let's define one secret that validates the request on server side?
+
+---
+
+perfect.
+
+
+now you want to do refactor or make implementation cleaner?
+
+---
+
+let's write client for seo-api bc we will use this as tool for the agent that will craft the content. 
+
+
+i am still thinking the agent part
