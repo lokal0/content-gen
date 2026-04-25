@@ -252,6 +252,7 @@ async def _structure_articles(client: anthropic.AsyncAnthropic, raw_content: str
 async def run_content_agent(pipeline_result: PipelineResult, job_id: "uuid.UUID | None" = None) -> AgentResult:
     import uuid as _uuid
     from app.services.progress import update_progress, update_agent_progress
+    from app.services.event_bus import emit_tool_call, emit_thinking, emit_text_chunk, emit_article, emit_complete
 
     client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
     system_prompt = _build_system_prompt(pipeline_result)
@@ -285,8 +286,12 @@ async def run_content_agent(pipeline_result: PipelineResult, job_id: "uuid.UUID 
         for block in response.content:
             if block.type == "thinking":
                 agent_result.thinking_blocks.append(block.thinking)
+                if job_id:
+                    await emit_thinking(job_id, block.thinking)
             elif block.type == "text":
                 agent_result.full_response += block.text
+                if job_id:
+                    await emit_text_chunk(job_id, block.text)
 
         if response.stop_reason == "end_turn":
             logger.info("Agent finished after %d iterations", iteration + 1)
@@ -319,6 +324,8 @@ async def run_content_agent(pipeline_result: PipelineResult, job_id: "uuid.UUID 
                     tool_input_preview=json.dumps(tool.input)[:80],
                 )
             result = await _execute_tool(tool.name, tool.input)
+            if job_id:
+                await emit_tool_call(job_id, tool.name, tool.input, result)
             agent_result.tool_calls.append({
                 "name": tool.name,
                 "input": tool.input,
@@ -346,5 +353,14 @@ async def run_content_agent(pipeline_result: PipelineResult, job_id: "uuid.UUID 
             await update_progress(job_id, "agent_writing", "Structuring articles...")
         agent_result.articles = await _structure_articles(client, agent_result.full_response)
         logger.info("Structured %d articles from agent output", len(agent_result.articles))
+
+        if job_id:
+            for a in agent_result.articles:
+                await emit_article(job_id, {
+                    "cluster_id": a.cluster_id,
+                    "target_keyword": a.target_keyword,
+                    "meta_title": a.meta_title,
+                    "content_type": a.content_type,
+                })
 
     return agent_result

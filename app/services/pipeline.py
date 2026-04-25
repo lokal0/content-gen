@@ -174,6 +174,7 @@ async def run_pipeline(
     skip_domain_enrichment: bool = False,
 ) -> PipelineResult:
     from app.services.progress import update_progress
+    from app.services.event_bus import emit_stage
     import uuid as _uuid
 
     cache_key = str(job_id) if job_id else None
@@ -190,6 +191,7 @@ async def run_pipeline(
     async def progress(stage: str, detail: str | None = None):
         if job_id:
             await update_progress(job_id, stage, detail)
+            await emit_stage(job_id, stage, detail)
 
     business = BusinessProfile(name=business_name)
     if business_url:

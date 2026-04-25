@@ -378,8 +378,13 @@ async def _run_pipeline_task(
 
         logger.info("Job %s completed", job_id)
 
+        from app.services.event_bus import emit_complete
+        await emit_complete(job_id, {"job_id": str(job_id), "articles_count": len(agent_result.articles)})
+
     except Exception as e:
         logger.exception("Job %s failed: %s", job_id, e)
+        from app.services.event_bus import emit_error
+        await emit_error(job_id, str(e))
         async with async_session() as db:
             submission = await db.get(Submission, job_id)
             if submission:
@@ -442,3 +447,30 @@ async def get_analysis(job_id: str):
             response.update(submission.result_json)
 
         return response
+
+
+@router.get("/analyze/{job_id}/stream")
+async def stream_analysis(job_id: str):
+    import json as _json
+    from fastapi.responses import StreamingResponse
+    from app.services.event_bus import get_queue
+
+    job_uuid = uuid.UUID(job_id)
+    queue = get_queue(job_uuid)
+
+    async def event_generator():
+        yield f"data: {_json.dumps({'event': 'connected', 'data': {'job_id': job_id}})}\n\n"
+        while True:
+            try:
+                event = await asyncio.wait_for(queue.get(), timeout=30.0)
+                yield f"data: {_json.dumps(event)}\n\n"
+                if event.get("event") in ("complete", "error"):
+                    break
+            except asyncio.TimeoutError:
+                yield f"data: {_json.dumps({'event': 'heartbeat', 'data': {}})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
