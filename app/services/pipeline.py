@@ -87,12 +87,12 @@ async def _gather_business_data(business: BusinessProfile) -> None:
 
 
 
-async def _enrich_keywords(keywords: list[str]) -> dict[str, dict]:
+async def _enrich_keywords(keywords: list[str], location_code: int = 2840, language_code: str = "en") -> dict[str, dict]:
     metrics = {}
     for i in range(0, len(keywords), 700):
         batch = keywords[i : i + 700]
         try:
-            results = await seo_client.keyword_overview(batch)
+            results = await seo_client.keyword_overview(batch, location_code=location_code, language_code=language_code)
             for kw in results:
                 metrics[kw.keyword.lower()] = {
                     "keyword": kw.keyword,
@@ -196,6 +196,32 @@ async def run_pipeline(
         business.url = business_url
         business.domain = _extract_domain(business_url)
 
+    # Resolve geo location for accurate SERP/keyword data
+    import re as _re
+    city = business_location or ""
+    country_code = ""
+    COUNTRY_DETECT = {
+        "germany": "DE", "deutschland": "DE", "austria": "AT",
+        "switzerland": "CH", "france": "FR", "spain": "ES",
+        "italy": "IT", "united kingdom": "GB", "united states": "US",
+        "turkey": "TR", "netherlands": "NL",
+    }
+    if business_location:
+        for name, code in COUNTRY_DETECT.items():
+            if name in business_location.lower():
+                country_code = code
+                break
+        parts = [p.strip() for p in business_location.split(",")]
+        for part in parts:
+            cleaned = _re.sub(r"\d{4,5}\s*", "", part).strip()
+            if cleaned and not any(c.isdigit() for c in cleaned) and len(cleaned) > 2:
+                if cleaned.lower() not in ("germany", "deutschland", "de", "at", "ch"):
+                    city = cleaned
+                    break
+
+    location_code, language_code = await seo_client.resolve_location(city, country_code)
+    logger.info("Pipeline geo: %s (%s) → code=%d, lang=%s", city, country_code, location_code, language_code)
+
     if not competitor_urls:
         await progress("discovering_competitors", f"Searching for competitors of {business_name or 'business'}")
         competitor_urls = await _discover_competitors(
@@ -270,7 +296,7 @@ async def run_pipeline(
         await progress("enriching_keywords", f"Using cached metrics for {len(keyword_metrics)} keywords")
     else:
         await progress("enriching_keywords", f"Enriching top {len(keywords_to_enrich)} keywords with search metrics")
-        keyword_metrics = await _enrich_keywords(keywords_to_enrich)
+        keyword_metrics = await _enrich_keywords(keywords_to_enrich, location_code=location_code, language_code=language_code)
         save_stage("keyword_metrics", keyword_metrics)
         await progress("enriching_keywords", f"Got metrics for {len(keyword_metrics)} keywords")
 
