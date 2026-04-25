@@ -246,16 +246,28 @@ async def run_pipeline(
     all_keywords = list(all_keywords_set)
     await progress("extracting_keywords", f"Found {len(all_keywords)} unique keywords")
 
-    await progress("enriching_keywords", f"Enriching {len(all_keywords)} keywords with search metrics")
-    keyword_metrics = await _enrich_keywords(all_keywords)
+    # Only enrich top 50 keywords to save DataForSEO credits
+    # Prioritize: ranked keywords from SEO data first, then top extracted by score
+    ranked_kws = set()
+    for profile in profiles:
+        ranked_kws.update(list(profile.ranked_keywords)[:20])
+    extracted_by_score = sorted(
+        [(kw["keyword"].lower(), kw["score"]) for p in profiles for kw in p.extracted_keywords],
+        key=lambda x: x[1], reverse=True,
+    )
+    top_extracted = [kw for kw, _ in extracted_by_score if kw not in ranked_kws][:50 - len(ranked_kws)]
+    keywords_to_enrich = list(ranked_kws | set(top_extracted))[:50]
+
+    await progress("enriching_keywords", f"Enriching top {len(keywords_to_enrich)} keywords with search metrics")
+    keyword_metrics = await _enrich_keywords(keywords_to_enrich)
     await progress("enriching_keywords", f"Got metrics for {len(keyword_metrics)} keywords")
 
-    await progress("classifying_intent", f"Classifying {len(all_keywords)} keywords with Pioneer GLiNER2")
-    keyword_intents = await classify_keywords(all_keywords)
+    await progress("classifying_intent", f"Classifying {len(keywords_to_enrich)} keywords")
+    keyword_intents = await classify_keywords(keywords_to_enrich)
     await progress("classifying_intent", f"Classified {len(keyword_intents)} keywords by intent")
 
-    await progress("embedding_keywords", f"Embedding {len(all_keywords)} keywords with Gemini")
-    keywords_to_cluster = [kw for kw in all_keywords if kw in keyword_metrics]
+    await progress("embedding_keywords", f"Embedding {len(keywords_to_enrich)} keywords with Gemini")
+    keywords_to_cluster = [kw for kw in keywords_to_enrich if kw in keyword_metrics]
     competitor_keywords = {p.url: p.ranked_keywords for p in profiles}
 
     topic_clusters = await build_topic_clusters(
