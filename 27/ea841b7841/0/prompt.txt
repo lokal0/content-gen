@@ -54,3 +54,13 @@ DATABASE_URL='postgresql://neondb_owner:npg_9pMXPbSHg0Ia@ep-misty-sea-al9m9q33-p
 ---
 
 go check web. or discover oktai project. that uses kamal perfectly
+
+---
+
+btw can we involve this seo-api in the docker image
+
+we build?
+
+---
+
+do the option 2.
