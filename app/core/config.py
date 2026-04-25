@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     seo_api_url: str = "http://localhost:3000"
     seo_api_token: str = ""
     api_bearer_token: str = ""
+    gemini_api_key: str = ""
+    anthropic_api_key: str = ""
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

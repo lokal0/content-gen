@@ -5,13 +5,12 @@ from app.api.schemas import (
     AnalyzeRequest,
     AnalyzeResponse,
     CompetitorOut,
-    CrawledPageOut,
     KeywordOut,
+    TopicClusterOut,
 )
 from app.core.database import get_db
 from app.models.tables import Competitor, CrawledPage, Keyword, Submission
-from app.services.crawler import crawl_all_competitors
-from app.services.keyword_extractor import extract_all_keywords
+from app.services.pipeline import run_pipeline
 
 router = APIRouter()
 
@@ -22,70 +21,81 @@ async def analyze_competitors(request: AnalyzeRequest, db: AsyncSession = Depend
     db.add(submission)
     await db.flush()
 
-    competitor_records = {}
-    for url in request.urls:
-        comp = Competitor(submission_id=submission.id, url=str(url))
+    urls = [str(u) for u in request.urls]
+
+    result = await run_pipeline(urls)
+
+    # Persist to database
+    for profile in result.competitors:
+        comp = Competitor(submission_id=submission.id, url=profile.url)
         db.add(comp)
-        competitor_records[str(url)] = comp
-    await db.flush()
+        await db.flush()
 
-    crawl_results = await crawl_all_competitors([str(u) for u in request.urls])
+        if profile.crawl_result:
+            for page in profile.crawl_result.pages:
+                crawled = CrawledPage(
+                    competitor_id=comp.id,
+                    url=page.url,
+                    title=page.title,
+                    full_text=page.full_text,
+                    headings=page.headings,
+                    page_metadata=page.metadata,
+                    schema_org=page.schema_org,
+                    raw_content=page.raw_content,
+                )
+                db.add(crawled)
 
-    for cr in crawl_results:
-        comp = competitor_records[cr.competitor_url]
-        for page in cr.pages:
-            crawled = CrawledPage(
-                competitor_id=comp.id,
-                url=page.url,
-                title=page.title,
-                full_text=page.full_text,
-                headings=page.headings,
-                page_metadata=page.metadata,
-                schema_org=page.schema_org,
-                raw_content=page.raw_content,
-            )
-            db.add(crawled)
-    await db.flush()
-
-    all_keywords = extract_all_keywords(crawl_results)
-
-    for url, keywords in all_keywords.items():
-        comp = competitor_records[url]
-        for kw in keywords:
+        for kw_data in profile.extracted_keywords:
             keyword_record = Keyword(
                 competitor_id=comp.id,
-                keyword=kw.keyword,
-                score=kw.score,
-                method=kw.method,
+                keyword=kw_data["keyword"],
+                score=kw_data["score"],
+                method=kw_data["method"],
             )
             db.add(keyword_record)
 
     submission.status = "completed"
     await db.commit()
 
-    competitors_out = []
-    for cr in crawl_results:
-        url = cr.competitor_url
-        kws = all_keywords.get(url, [])
-        competitors_out.append(CompetitorOut(
-            url=url,
-            pages_crawled=len(cr.pages),
-            keywords=[KeywordOut(keyword=k.keyword, score=k.score, method=k.method) for k in kws],
-            pages=[
-                CrawledPageOut(
-                    url=p.url,
-                    title=p.title,
-                    headings=p.headings,
-                    metadata=p.metadata,
-                    schema_org=p.schema_org,
-                )
-                for p in cr.pages
+    # Build response
+    competitors_out = [
+        CompetitorOut(
+            url=p.url,
+            domain=p.domain,
+            pages_crawled=len(p.crawl_result.pages) if p.crawl_result else 0,
+            organic_traffic=p.organic_traffic,
+            organic_keywords=p.organic_keywords,
+            ranked_keywords_count=len(p.ranked_keywords),
+            extracted_keywords=[
+                KeywordOut(keyword=kw["keyword"], score=kw["score"], method=kw["method"])
+                for kw in p.extracted_keywords[:30]
             ],
-        ))
+            top_pages=p.top_pages[:10],
+        )
+        for p in result.competitors
+    ]
+
+    clusters_out = [
+        TopicClusterOut(
+            id=c.id,
+            label=c.label,
+            keywords=c.keywords,
+            total_search_volume=c.total_search_volume,
+            avg_keyword_difficulty=c.avg_keyword_difficulty,
+            avg_cpc=c.avg_cpc,
+            competitor_coverage=c.competitor_coverage,
+            opportunity_score=c.opportunity_score,
+            keyword_metrics=c.keyword_metrics,
+        )
+        for c in result.topic_clusters[:20]
+    ]
 
     return AnalyzeResponse(
         submission_id=submission.id,
         status=submission.status,
         created_at=submission.created_at,
+        total_keywords_found=result.total_keywords_found,
+        total_clusters=result.total_clusters,
         competitors=competitors_out,
+        topic_clusters=clusters_out,
     )
