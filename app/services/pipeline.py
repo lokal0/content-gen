@@ -161,6 +161,9 @@ async def _discover_competitors(
     return urls
 
 
+_stage_cache: dict[str, dict[str, Any]] = {}
+
+
 async def run_pipeline(
     competitor_urls: list[str],
     business_url: str | None = None,
@@ -172,6 +175,17 @@ async def run_pipeline(
 ) -> PipelineResult:
     from app.services.progress import update_progress
     import uuid as _uuid
+
+    cache_key = str(job_id) if job_id else None
+    cache = _stage_cache.get(cache_key, {}) if cache_key else {}
+
+    def save_stage(stage: str, data: Any):
+        if cache_key:
+            cache[stage] = data
+            _stage_cache[cache_key] = cache
+
+    def get_stage(stage: str) -> Any | None:
+        return cache.get(stage)
 
     async def progress(stage: str, detail: str | None = None):
         if job_id:
@@ -198,20 +212,26 @@ async def run_pipeline(
         for url in competitor_urls
     ]
 
-    await progress("crawling", f"Crawling {len(competitor_urls)} competitor websites")
-
-    gather_tasks = [crawl_all_competitors(competitor_urls)]
-    if not skip_domain_enrichment:
-        await progress("gathering_seo_data", f"Fetching SEO data for {len(profiles)} domains")
-        gather_tasks.append(_gather_competitor_data(profiles))
-        if business.domain:
-            gather_tasks.append(_gather_business_data(business))
+    # Stage: crawling
+    cached_crawl = get_stage("crawl_results")
+    if cached_crawl:
+        crawl_results = cached_crawl
+        await progress("crawling", f"Using cached crawl data ({len(crawl_results)} competitors)")
     else:
-        await progress("gathering_seo_data", "Using cached SEO data from audit")
+        await progress("crawling", f"Crawling {len(competitor_urls)} competitor websites")
+        gather_tasks = [crawl_all_competitors(competitor_urls)]
+        if not skip_domain_enrichment:
+            await progress("gathering_seo_data", f"Fetching SEO data for {len(profiles)} domains")
+            gather_tasks.append(_gather_competitor_data(profiles))
+            if business.domain:
+                gather_tasks.append(_gather_business_data(business))
+        else:
+            await progress("gathering_seo_data", "Using cached SEO data from audit")
+        results = await asyncio.gather(*gather_tasks)
+        crawl_results = results[0]
+        save_stage("crawl_results", crawl_results)
 
-    results = await asyncio.gather(*gather_tasks)
-    crawl_results = results[0]
-
+    # Stage: extracting keywords
     await progress("extracting_keywords", "Extracting keywords from crawled content")
     extracted = extract_all_keywords(crawl_results)
     for cr in crawl_results:
@@ -233,8 +253,6 @@ async def run_pipeline(
     all_keywords = list(all_keywords_set)
     await progress("extracting_keywords", f"Found {len(all_keywords)} unique keywords")
 
-    # Only enrich top 50 keywords to save DataForSEO credits
-    # Prioritize: ranked keywords from SEO data first, then top extracted by score
     ranked_kws = set()
     for profile in profiles:
         ranked_kws.update(list(profile.ranked_keywords)[:20])
@@ -245,13 +263,27 @@ async def run_pipeline(
     top_extracted = [kw for kw, _ in extracted_by_score if kw not in ranked_kws][:50 - len(ranked_kws)]
     keywords_to_enrich = list(ranked_kws | set(top_extracted))[:50]
 
-    await progress("enriching_keywords", f"Enriching top {len(keywords_to_enrich)} keywords with search metrics")
-    keyword_metrics = await _enrich_keywords(keywords_to_enrich)
-    await progress("enriching_keywords", f"Got metrics for {len(keyword_metrics)} keywords")
+    # Stage: enriching keywords
+    cached_metrics = get_stage("keyword_metrics")
+    if cached_metrics:
+        keyword_metrics = cached_metrics
+        await progress("enriching_keywords", f"Using cached metrics for {len(keyword_metrics)} keywords")
+    else:
+        await progress("enriching_keywords", f"Enriching top {len(keywords_to_enrich)} keywords with search metrics")
+        keyword_metrics = await _enrich_keywords(keywords_to_enrich)
+        save_stage("keyword_metrics", keyword_metrics)
+        await progress("enriching_keywords", f"Got metrics for {len(keyword_metrics)} keywords")
 
-    await progress("classifying_intent", f"Classifying {len(keywords_to_enrich)} keywords")
-    keyword_intents = await classify_keywords(keywords_to_enrich)
-    await progress("classifying_intent", f"Classified {len(keyword_intents)} keywords by intent")
+    # Stage: classifying intent
+    cached_intents = get_stage("keyword_intents")
+    if cached_intents:
+        keyword_intents = cached_intents
+        await progress("classifying_intent", f"Using cached intent for {len(keyword_intents)} keywords")
+    else:
+        await progress("classifying_intent", f"Classifying {len(keywords_to_enrich)} keywords")
+        keyword_intents = await classify_keywords(keywords_to_enrich)
+        save_stage("keyword_intents", keyword_intents)
+        await progress("classifying_intent", f"Classified {len(keyword_intents)} keywords by intent")
 
     await progress("embedding_keywords", f"Embedding {len(keywords_to_enrich)} keywords with Gemini")
     keywords_to_cluster = [kw for kw in keywords_to_enrich if kw in keyword_metrics]

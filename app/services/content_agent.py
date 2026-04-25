@@ -174,6 +174,25 @@ Write content from {biz_name}'s perspective. Position them as the solution. Focu
 Clearly separate each article with a horizontal rule (---) and start each with a H1 heading. Write content that is genuinely better and more comprehensive than what currently ranks."""
 
 
+from pydantic import BaseModel
+
+
+class ContentPieceModel(BaseModel):
+    cluster_id: int
+    target_keyword: str
+    supporting_keywords: list[str] = []
+    search_intent: str = ""
+    meta_title: str = ""
+    meta_description: str = ""
+    content_type: str = ""
+    competitive_angle: str = ""
+    article_markdown: str = ""
+
+
+class ArticlesOutput(BaseModel):
+    articles: list[ContentPieceModel]
+
+
 @dataclass
 class ContentPiece:
     cluster_id: int
@@ -183,7 +202,6 @@ class ContentPiece:
     meta_title: str = ""
     meta_description: str = ""
     content_type: str = ""
-    estimated_word_count: int = 0
     competitive_angle: str = ""
     article_markdown: str = ""
 
@@ -198,70 +216,37 @@ class AgentResult:
     total_output_tokens: int = 0
 
 
-ARTICLES_SCHEMA = {
-    "type": "json_schema",
-    "schema": {
-        "type": "object",
-        "properties": {
-            "articles": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "cluster_id": {"type": "integer"},
-                        "target_keyword": {"type": "string"},
-                        "supporting_keywords": {"type": "array", "items": {"type": "string"}},
-                        "search_intent": {"type": "string"},
-                        "meta_title": {"type": "string"},
-                        "meta_description": {"type": "string"},
-                        "content_type": {"type": "string"},
-                        "competitive_angle": {"type": "string"},
-                        "article_markdown": {"type": "string"},
-                    },
-                    "required": ["cluster_id", "target_keyword", "meta_title", "article_markdown"],
-                    "additionalProperties": False,
-                },
-            },
-        },
-        "required": ["articles"],
-        "additionalProperties": False,
-    },
-}
-
-
 async def _structure_articles(client: anthropic.AsyncAnthropic, raw_content: str) -> list[ContentPiece]:
-    response = await client.messages.create(
+    response = await client.messages.parse(
         model=MODEL,
         max_tokens=MAX_TOKENS,
-        output_config={"format": ARTICLES_SCHEMA},
+        output_format=ArticlesOutput,
         messages=[
             {
                 "role": "user",
-                "content": f"Extract and structure each article from this content into the required JSON format. Preserve all markdown content exactly.\n\n{raw_content}",
+                "content": f"Extract and structure each article from this content. Preserve all markdown content exactly.\n\n{raw_content}",
             }
         ],
     )
 
-    text = next((b.text for b in response.content if b.type == "text"), "")
-    try:
-        data = json.loads(text)
+    if response.parsed_output:
         return [
             ContentPiece(
-                cluster_id=a.get("cluster_id", 0),
-                target_keyword=a.get("target_keyword", ""),
-                supporting_keywords=a.get("supporting_keywords", []),
-                search_intent=a.get("search_intent", ""),
-                meta_title=a.get("meta_title", ""),
-                meta_description=a.get("meta_description", ""),
-                content_type=a.get("content_type", ""),
-                competitive_angle=a.get("competitive_angle", ""),
-                article_markdown=a.get("article_markdown", ""),
+                cluster_id=a.cluster_id,
+                target_keyword=a.target_keyword,
+                supporting_keywords=a.supporting_keywords,
+                search_intent=a.search_intent,
+                meta_title=a.meta_title,
+                meta_description=a.meta_description,
+                content_type=a.content_type,
+                competitive_angle=a.competitive_angle,
+                article_markdown=a.article_markdown,
             )
-            for a in data.get("articles", [])
+            for a in response.parsed_output.articles
         ]
-    except json.JSONDecodeError:
-        logger.error("Failed to parse structured articles output")
-        return []
+
+    logger.error("Failed to parse structured articles output")
+    return []
 
 
 async def run_content_agent(pipeline_result: PipelineResult, job_id: "uuid.UUID | None" = None) -> AgentResult:
