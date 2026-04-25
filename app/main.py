@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 import nltk
 from fastapi import Depends, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import router
 from app.core.auth import verify_bearer_token
@@ -20,6 +21,14 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Content Gen - Competitor Analysis Engine", lifespan=lifespan, dependencies=[Depends(verify_bearer_token)])
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/health")
