@@ -25,7 +25,22 @@ class CompetitorProfile:
 
 
 @dataclass
+class BusinessProfile:
+    url: str | None = None
+    domain: str | None = None
+    name: str | None = None
+    organic_traffic: int | None = None
+    organic_keywords: int | None = None
+    ranked_keywords: set[str] = field(default_factory=set)
+
+    @property
+    def display_name(self) -> str:
+        return self.domain or self.name or "your business"
+
+
+@dataclass
 class PipelineResult:
+    business: BusinessProfile
     competitors: list[CompetitorProfile]
     topic_clusters: list[TopicCluster]
     all_keyword_metrics: dict[str, dict]
@@ -67,6 +82,26 @@ async def _gather_competitor_data(profiles: list[CompetitorProfile]) -> None:
     await asyncio.gather(*[fetch_one(p) for p in profiles])
 
 
+async def _gather_business_data(business: BusinessProfile) -> None:
+    try:
+        overview = await seo_client.domain_overview(business.domain)
+        business.organic_traffic = overview.organic_traffic
+        business.organic_keywords = overview.organic_keywords
+        for kw in overview.keywords:
+            business.ranked_keywords.add(kw.get("keyword", "").lower())
+        logger.info("Business %s: %d ranked keywords", business.domain, len(business.ranked_keywords))
+    except Exception as e:
+        logger.warning("domain_overview failed for business %s: %s", business.domain, e)
+
+    try:
+        suggestions = await seo_client.domain_suggestions(business.domain)
+        for kw in suggestions:
+            business.ranked_keywords.add(kw.get("keyword", "").lower())
+        logger.info("Business %s: %d total ranked keywords", business.domain, len(business.ranked_keywords))
+    except Exception as e:
+        logger.warning("domain_suggestions failed for business %s: %s", business.domain, e)
+
+
 async def _enrich_keywords(keywords: list[str]) -> dict[str, dict]:
     metrics = {}
     for i in range(0, len(keywords), 700):
@@ -87,18 +122,105 @@ async def _enrich_keywords(keywords: list[str]) -> dict[str, dict]:
     return metrics
 
 
-async def run_pipeline(urls: list[str]) -> PipelineResult:
+async def _discover_competitors(
+    business_name: str | None,
+    business_category: str | None,
+    business_location: str | None,
+    limit: int = 5,
+) -> list[str]:
+    """Use Tavily search to find competitor website URLs when none are provided."""
+    from tavily import TavilyClient
+    from app.core.config import settings
+
+    if not settings.tavily_api_key:
+        return []
+
+    parts = []
+    if business_category:
+        parts.append(f"best {business_category}")
+    elif business_name:
+        parts.append(f"businesses similar to {business_name}")
+    else:
+        return []
+
+    if business_location:
+        parts.append(f"in {business_location}")
+
+    query = " ".join(parts) + " website"
+    logger.info("Discovering competitors via Tavily: %s", query)
+
+    try:
+        client = TavilyClient(api_key=settings.tavily_api_key)
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(
+            None,
+            lambda: client.search(query=query, max_results=limit * 2, search_depth="basic"),
+        )
+
+        urls = []
+        seen_domains = set()
+        skip_domains = {"google.com", "yelp.com", "tripadvisor.com", "facebook.com", "instagram.com", "maps.google.com", "wikipedia.org"}
+        biz_domain = _extract_domain(f"https://{business_name}") if business_name else ""
+
+        for r in response.get("results", []):
+            url = r.get("url", "")
+            if not url:
+                continue
+            domain = _extract_domain(url)
+            if domain in seen_domains or domain in skip_domains:
+                continue
+            if biz_domain and domain == biz_domain:
+                continue
+            seen_domains.add(domain)
+            urls.append(f"https://{domain}")
+            if len(urls) >= limit:
+                break
+
+        logger.info("Discovered %d competitor URLs: %s", len(urls), urls)
+        return urls
+    except Exception as e:
+        logger.warning("Competitor discovery failed: %s", e)
+        return []
+
+
+async def run_pipeline(
+    competitor_urls: list[str],
+    business_url: str | None = None,
+    business_name: str | None = None,
+    business_category: str | None = None,
+    business_location: str | None = None,
+) -> PipelineResult:
+    business = BusinessProfile(name=business_name)
+    if business_url:
+        business.url = business_url
+        business.domain = _extract_domain(business_url)
+
+    # Discover competitors if none provided
+    if not competitor_urls:
+        competitor_urls = await _discover_competitors(
+            business_name=business_name,
+            business_category=business_category,
+            business_location=business_location,
+        )
+        if not competitor_urls:
+            raise ValueError("No competitor URLs provided and auto-discovery found none. Provide at least one competitor URL.")
+
     profiles = [
         CompetitorProfile(url=url, domain=_extract_domain(url))
-        for url in urls
+        for url in competitor_urls
     ]
 
-    # Phase 1a: Crawl + SEO data in parallel
+    # Phase 1a: Crawl competitors + gather SEO data for business & competitors in parallel
     logger.info("Phase 1: Crawling competitors and gathering SEO data")
-    crawl_results, _ = await asyncio.gather(
-        crawl_all_competitors(urls),
+    gather_tasks = [
+        crawl_all_competitors(competitor_urls),
         _gather_competitor_data(profiles),
-    )
+    ]
+    if business.domain:
+        gather_tasks.append(_gather_business_data(business))
+
+    results = await asyncio.gather(*gather_tasks)
+    crawl_results = results[0]
 
     # Phase 1b: Extract keywords from crawled content
     extracted = extract_all_keywords(crawl_results)
@@ -142,11 +264,13 @@ async def run_pipeline(urls: list[str]) -> PipelineResult:
         keyword_metrics=keyword_metrics,
         competitor_keywords=competitor_keywords,
         keyword_intents=keyword_intents,
+        business_keywords=business.ranked_keywords,
         min_cluster_size=3,
     )
     logger.info("Phase 2 complete: %d topic clusters", len(topic_clusters))
 
     return PipelineResult(
+        business=business,
         competitors=profiles,
         topic_clusters=topic_clusters,
         all_keyword_metrics=keyword_metrics,

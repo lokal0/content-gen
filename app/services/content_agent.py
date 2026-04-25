@@ -124,6 +124,16 @@ async def _execute_tool(name: str, input_data: dict) -> str:
 
 
 def _build_system_prompt(pipeline_result: PipelineResult) -> str:
+    biz = pipeline_result.business
+    biz_name = biz.display_name
+    if biz.domain:
+        business_summary = (
+            f"{biz.domain}: {biz.organic_traffic or 'N/A'} organic traffic, "
+            f"{len(biz.ranked_keywords)} ranked keywords"
+        )
+    else:
+        business_summary = f"{biz_name} (no website yet — pre-launch)"
+
     competitors_summary = []
     for c in pipeline_result.competitors:
         competitors_summary.append(
@@ -152,7 +162,10 @@ def _build_system_prompt(pipeline_result: PipelineResult) -> str:
             f"cpc=${cluster.avg_cpc:.2f} | intents: {intent_str} | coverage: {coverage or 'none'}"
         )
 
-    return f"""You are an expert SEO content strategist. You have analyzed 5 competitor websites and identified topic clusters ranked by opportunity.
+    return f"""You are an expert SEO content strategist working for **{biz_name}**. You have analyzed their competitor websites and identified topic clusters ranked by opportunity — these are keyword gaps where competitors rank but {biz_name} does not.
+
+## Your Client
+{business_summary}
 
 ## Competitor Overview
 {chr(10).join(competitors_summary)}
@@ -160,8 +173,10 @@ def _build_system_prompt(pipeline_result: PipelineResult) -> str:
 ## Top Topic Clusters (ranked by opportunity score)
 {chr(10).join(clusters_summary)}
 
+Clusters are ranked by a composite score: search volume × competitor coverage gap × keyword difficulty × intent weight × novelty (keywords {biz_name} doesn't already rank for score higher).
+
 ## Your Task
-For each of the top topic clusters, produce a detailed content brief and then write the full SEO-optimized content.
+For each of the top topic clusters, produce a detailed content brief and then write the full SEO-optimized content **for {biz_name}'s blog/website**.
 
 **Process for each cluster:**
 1. Use `keyword_serp` to analyze the current top-ranking pages for the primary keyword
@@ -176,11 +191,11 @@ A complete content brief followed by the full article in markdown, including:
 - Meta title (≤60 chars) and meta description (≤155 chars)
 - Full article with proper heading hierarchy (H1, H2, H3)
 - Target word count based on SERP analysis
-- Competitive angle (what you do better than current top results)
+- Competitive angle (what {biz_name} does better than current top results)
 - Schema.org markup suggestions
 - Internal linking opportunities
 
-Focus on the top 3-5 clusters with the highest opportunity scores. Write content that is genuinely better and more comprehensive than what currently ranks."""
+Write content from {biz_name}'s perspective. Position them as the solution. Focus on the top 3-5 clusters with the highest opportunity scores. Write content that is genuinely better and more comprehensive than what currently ranks."""
 
 
 @dataclass

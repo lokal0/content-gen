@@ -5,6 +5,7 @@ from app.api.schemas import (
     AgentToolCallOut,
     AnalyzeRequest,
     AnalyzeResponse,
+    BusinessProfileOut,
     CompetitorOut,
     ContentAgentOut,
     KeywordOut,
@@ -53,52 +54,57 @@ async def check_training_job(job_id: str):
 
 
 @router.post("/analyze", response_model=AnalyzeResponse)
-async def analyze_competitors(request: AnalyzeRequest, db: AsyncSession = Depends(get_db)):
-    submission = Submission(status="processing")
-    db.add(submission)
-    await db.flush()
+async def analyze_competitors(request: AnalyzeRequest):
+    business_url = str(request.business_url) if request.business_url else None
+    competitor_urls = [str(u) for u in request.competitor_urls]
 
-    urls = [str(u) for u in request.urls]
+    result = await run_pipeline(
+        competitor_urls=competitor_urls,
+        business_url=business_url,
+        business_name=request.business_name,
+        business_category=request.business_category,
+        business_location=request.business_location,
+    )
 
-    result = await run_pipeline(urls)
-
-    # Persist to database
-    for profile in result.competitors:
-        comp = Competitor(submission_id=submission.id, url=profile.url)
-        db.add(comp)
-        await db.flush()
-
-        if profile.crawl_result:
-            for page in profile.crawl_result.pages:
-                crawled = CrawledPage(
-                    competitor_id=comp.id,
-                    url=page.url,
-                    title=page.title,
-                    full_text=page.full_text,
-                    headings=page.headings,
-                    page_metadata=page.metadata,
-                    schema_org=page.schema_org,
-                    raw_content=page.raw_content,
-                )
-                db.add(crawled)
-
-        for kw_data in profile.extracted_keywords:
-            keyword_record = Keyword(
-                competitor_id=comp.id,
-                keyword=kw_data["keyword"],
-                score=kw_data["score"],
-                method=kw_data["method"],
-            )
-            db.add(keyword_record)
-
-    # Collect training samples from DataForSEO intent labels for Pioneer fine-tuning
-    await collect_training_samples(result.all_keyword_metrics, db)
-
-    # Phase 4-5: Agent produces content briefs and writes articles
     agent_result = await run_content_agent(result)
 
-    submission.status = "completed"
-    await db.commit()
+    # Persist after all long-running work is done (fresh DB connection)
+    from app.core.database import async_session
+    async with async_session() as db:
+        submission = Submission(status="completed")
+        db.add(submission)
+        await db.flush()
+
+        for profile in result.competitors:
+            comp = Competitor(submission_id=submission.id, url=profile.url)
+            db.add(comp)
+            await db.flush()
+
+            if profile.crawl_result:
+                for page in profile.crawl_result.pages:
+                    crawled = CrawledPage(
+                        competitor_id=comp.id,
+                        url=page.url,
+                        title=page.title,
+                        full_text=page.full_text,
+                        headings=page.headings,
+                        page_metadata=page.metadata,
+                        schema_org=page.schema_org,
+                        raw_content=page.raw_content,
+                    )
+                    db.add(crawled)
+
+            for kw_data in profile.extracted_keywords:
+                keyword_record = Keyword(
+                    competitor_id=comp.id,
+                    keyword=kw_data["keyword"],
+                    score=kw_data["score"],
+                    method=kw_data["method"],
+                )
+                db.add(keyword_record)
+
+        await collect_training_samples(result.all_keyword_metrics, db)
+        await db.commit()
 
     # Build response
     competitors_out = [
@@ -144,10 +150,20 @@ async def analyze_competitors(request: AnalyzeRequest, db: AsyncSession = Depend
         total_output_tokens=agent_result.total_output_tokens,
     )
 
+    business_out = BusinessProfileOut(
+        url=result.business.url,
+        domain=result.business.domain,
+        name=result.business.name,
+        organic_traffic=result.business.organic_traffic,
+        organic_keywords=result.business.organic_keywords,
+        ranked_keywords_count=len(result.business.ranked_keywords),
+    )
+
     return AnalyzeResponse(
         submission_id=submission.id,
         status=submission.status,
         created_at=submission.created_at,
+        business=business_out,
         total_keywords_found=result.total_keywords_found,
         total_clusters=result.total_clusters,
         competitors=competitors_out,

@@ -5,13 +5,17 @@ from pydantic import BaseModel, HttpUrl, field_validator
 
 
 class AnalyzeRequest(BaseModel):
-    urls: list[HttpUrl]
+    business_url: HttpUrl | None = None
+    business_name: str | None = None
+    business_category: str | None = None
+    business_location: str | None = None
+    competitor_urls: list[HttpUrl] = []
 
-    @field_validator("urls")
+    @field_validator("competitor_urls")
     @classmethod
-    def exactly_five_urls(cls, v):
-        if len(v) != 5:
-            raise ValueError("Exactly 5 competitor URLs are required")
+    def max_five_urls(cls, v):
+        if len(v) > 5:
+            raise ValueError("Maximum 5 competitor URLs allowed")
         return v
 
 
@@ -66,10 +70,20 @@ class ContentAgentOut(BaseModel):
     total_output_tokens: int = 0
 
 
+class BusinessProfileOut(BaseModel):
+    url: str | None = None
+    domain: str | None = None
+    name: str | None = None
+    organic_traffic: int | None = None
+    organic_keywords: int | None = None
+    ranked_keywords_count: int = 0
+
+
 class AnalyzeResponse(BaseModel):
     submission_id: uuid.UUID
     status: str
     created_at: datetime
+    business: BusinessProfileOut
     total_keywords_found: int = 0
     total_clusters: int = 0
     competitors: list[CompetitorOut]

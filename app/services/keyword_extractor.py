@@ -61,7 +61,7 @@ def extract_tfidf_keywords(crawl_results: list[CrawlResult], top_n: int = 30) ->
         stop_words="english",
         ngram_range=(1, 3),
         min_df=1,
-        max_df=0.9,
+        max_df=1.0 if len(docs) <= 2 else 0.9,
         token_pattern=r"(?u)\b[a-zA-Z][a-zA-Z+\-]{1,}\b",
     )
     tfidf_matrix = vectorizer.fit_transform(docs)

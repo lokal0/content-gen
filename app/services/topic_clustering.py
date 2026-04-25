@@ -18,23 +18,40 @@ def _get_gemini_client() -> genai.Client:
     return genai.Client(api_key=settings.gemini_api_key)
 
 
+async def _embed_batch_with_retry(client: genai.Client, batch: list[str], max_retries: int = 5) -> list:
+    loop = asyncio.get_event_loop()
+    for attempt in range(max_retries):
+        try:
+            response = await loop.run_in_executor(
+                None,
+                lambda b=batch: client.models.embed_content(
+                    model="gemini-embedding-2",
+                    contents=b,
+                    config={"output_dimensionality": EMBEDDING_DIMENSIONS},
+                ),
+            )
+            return [emb.values for emb in response.embeddings]
+        except Exception as e:
+            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                wait = 2 ** attempt + 1
+                logger.warning("Gemini rate limited (attempt %d/%d), waiting %ds", attempt + 1, max_retries, wait)
+                await asyncio.sleep(wait)
+            else:
+                raise
+    raise RuntimeError(f"Gemini embedding failed after {max_retries} retries")
+
+
 async def embed_keywords(keywords: list[str]) -> np.ndarray:
     client = _get_gemini_client()
     all_embeddings = []
-    loop = asyncio.get_event_loop()
 
     for i in range(0, len(keywords), BATCH_SIZE):
         batch = keywords[i : i + BATCH_SIZE]
-        response = await loop.run_in_executor(
-            None,
-            lambda b=batch: client.models.embed_content(
-                model="gemini-embedding-2",
-                contents=b,
-                config={"output_dimensionality": EMBEDDING_DIMENSIONS},
-            ),
-        )
-        for emb in response.embeddings:
-            all_embeddings.append(emb.values)
+        logger.info("Embedding batch %d/%d (%d keywords)", i // BATCH_SIZE + 1, (len(keywords) + BATCH_SIZE - 1) // BATCH_SIZE, len(batch))
+        embeddings = await _embed_batch_with_retry(client, batch)
+        all_embeddings.extend(embeddings)
+        if i + BATCH_SIZE < len(keywords):
+            await asyncio.sleep(1)
 
     return np.array(all_embeddings)
 
@@ -81,6 +98,7 @@ def score_clusters(
     keyword_metrics: dict[str, dict],
     competitor_keywords: dict[str, set[str]],
     keyword_intents: dict | None = None,
+    business_keywords: set[str] | None = None,
 ) -> list[TopicCluster]:
     from app.services.keyword_classifier import INTENT_WEIGHTS
 
@@ -122,13 +140,20 @@ def score_clusters(
             covered = sum(1 for kw in cluster.keywords if kw.lower() in comp_kws)
             cluster.competitor_coverage[url] = covered / len(cluster.keywords) if cluster.keywords else 0.0
 
+        # Business already-ranking factor: deprioritize clusters where the business already ranks
+        business_coverage = 0.0
+        if business_keywords and cluster.keywords:
+            business_covered = sum(1 for kw in cluster.keywords if kw.lower() in business_keywords)
+            business_coverage = business_covered / len(cluster.keywords)
+        novelty_factor = 1.0 - (business_coverage * 0.7)
+
         avg_coverage = np.mean(list(cluster.competitor_coverage.values())) if cluster.competitor_coverage else 0.0
         gap_factor = 1.0 - avg_coverage
         difficulty_factor = 1.0 - (cluster.avg_keyword_difficulty / 100.0) if cluster.avg_keyword_difficulty else 0.5
         avg_intent_weight = float(np.mean(intent_weights)) if intent_weights else 1.0
 
         cluster.opportunity_score = (
-            cluster.total_search_volume * gap_factor * difficulty_factor * avg_intent_weight
+            cluster.total_search_volume * gap_factor * difficulty_factor * avg_intent_weight * novelty_factor
         )
 
     clusters.sort(key=lambda c: c.opportunity_score, reverse=True)
@@ -140,6 +165,7 @@ async def build_topic_clusters(
     keyword_metrics: dict[str, dict],
     competitor_keywords: dict[str, set[str]],
     keyword_intents: dict | None = None,
+    business_keywords: set[str] | None = None,
     min_cluster_size: int = 3,
 ) -> list[TopicCluster]:
     if len(keywords) < min_cluster_size:
@@ -153,5 +179,5 @@ async def build_topic_clusters(
     clusters = cluster_keywords(keywords, embeddings, min_cluster_size)
     logger.info("Found %d topic clusters", len(clusters))
 
-    clusters = score_clusters(clusters, keyword_metrics, competitor_keywords, keyword_intents)
+    clusters = score_clusters(clusters, keyword_metrics, competitor_keywords, keyword_intents, business_keywords)
     return clusters
