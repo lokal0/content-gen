@@ -200,7 +200,7 @@ class AgentResult:
 
 ARTICLES_SCHEMA = {
     "type": "json_schema",
-    "json_schema": {
+    "schema": {
         "type": "object",
         "properties": {
             "articles": {
