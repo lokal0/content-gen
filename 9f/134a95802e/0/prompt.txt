@@ -200,3 +200,7 @@ but if business doesn't have website
 ---
 
 imagine they only have location
+
+---
+
+but once they submit their google maps we extract the location and data through google maps api
