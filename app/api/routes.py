@@ -72,28 +72,23 @@ async def discover_competitors(request: dict):
     if not category and not business_name:
         return {"competitors": [], "error": "Provide business_category or business_name"}
 
-    # Detect country from location for correct SERP results
-    COUNTRY_CODES = {
-        "germany": (2276, "de"), "deutschland": (2276, "de"),
-        "austria": (2040, "de"), "österreich": (2040, "de"),
-        "switzerland": (2756, "de"), "schweiz": (2756, "de"),
-        "netherlands": (2528, "nl"), "france": (2250, "fr"),
-        "spain": (2724, "es"), "italy": (2380, "it"),
-        "united kingdom": (2826, "en"), "uk": (2826, "en"),
-        "united states": (2840, "en"), "usa": (2840, "en"),
-        "turkey": (2792, "tr"), "türkiye": (2792, "tr"),
+    # Extract city and country from full address
+    import re as _re
+    city = location
+    country_code = ""
+
+    COUNTRY_DETECT = {
+        "germany": "DE", "deutschland": "DE", "austria": "AT", "österreich": "AT",
+        "switzerland": "CH", "schweiz": "CH", "netherlands": "NL", "france": "FR",
+        "spain": "ES", "italy": "IT", "united kingdom": "GB", "uk": "GB",
+        "united states": "US", "usa": "US", "turkey": "TR", "türkiye": "TR",
     }
-    location_code = 2840
-    language_code = "en"
     location_lower = location.lower()
-    for country, (code, lang) in COUNTRY_CODES.items():
-        if country in location_lower:
-            location_code = code
-            language_code = lang
+    for name, code in COUNTRY_DETECT.items():
+        if name in location_lower:
+            country_code = code
             break
 
-    # Extract city from full address (e.g. "Kollwitzstraße 71, 10435 Berlin, Germany" → "Berlin")
-    import re as _re
     city = location
     if location:
         parts = [p.strip() for p in location.split(",")]
@@ -103,6 +98,10 @@ async def discover_competitors(request: dict):
                 if cleaned not in ("Germany", "Deutschland", "DE"):
                     city = cleaned
                     break
+
+    # Resolve city-level location code via DataForSEO locations API
+    location_code, language_code = await seo_client.resolve_location(city, country_code)
+    logger.info("Resolved location: %s (%s) → code=%d, lang=%s", city, country_code, location_code, language_code)
 
     # Step 1: Use keyword_research to discover what people actually search
     initial_seed = f"{category} {city}" if category and city else f"{business_name} {city}" if business_name and city else category or business_name

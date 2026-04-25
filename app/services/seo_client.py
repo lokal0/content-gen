@@ -37,6 +37,54 @@ def _headers() -> dict[str, str]:
     return h
 
 
+async def resolve_location(city: str, country_code: str = "") -> tuple[int, str]:
+    """Resolve city name to DataForSEO location_code via their locations API. Returns (location_code, language_code)."""
+    import base64
+    ck = _cache_key("resolve_location", city=city.lower(), country_code=country_code)
+    cached = _cache_get(ck)
+    if cached is not None:
+        return cached
+
+    COUNTRY_LANG = {
+        "DE": "de", "AT": "de", "CH": "de", "NL": "nl", "FR": "fr",
+        "ES": "es", "IT": "it", "GB": "en", "US": "en", "TR": "tr",
+        "PL": "pl", "CZ": "cs", "SE": "sv", "DK": "da", "NO": "no",
+    }
+    COUNTRY_FALLBACK = {
+        "DE": (2276, "de"), "AT": (2040, "de"), "CH": (2756, "de"),
+        "FR": (2250, "fr"), "ES": (2724, "es"), "IT": (2380, "it"),
+        "GB": (2826, "en"), "US": (2840, "en"), "TR": (2792, "tr"),
+    }
+
+    try:
+        dataforseo_key = settings.seo_api_token
+        url = f"https://api.dataforseo.com/v3/serp/google/locations?country={country_code}" if country_code else "https://api.dataforseo.com/v3/serp/google/locations"
+
+        # We need DataForSEO creds directly — get from seo-api's env or use a dedicated config
+        # For now, use the seo-api proxy approach: add a /locations endpoint to seo-api
+        # Fallback: just use the seo-api to call it
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            r = await client.get(
+                f"{settings.seo_api_url}/locations?city={city}&country={country_code}",
+                headers=_headers(),
+            )
+            if r.status_code == 200:
+                data = r.json()
+                loc_code = data.get("location_code")
+                lang = data.get("language_code", "en")
+                if loc_code:
+                    result = (loc_code, lang)
+                    _cache_set(ck, result)
+                    return result
+    except Exception:
+        pass
+
+    # Fallback to country-level
+    fallback = COUNTRY_FALLBACK.get(country_code.upper(), (2840, "en"))
+    _cache_set(ck, fallback)
+    return fallback
+
+
 def _client() -> httpx.AsyncClient:
     return httpx.AsyncClient(
         base_url=settings.seo_api_url,
