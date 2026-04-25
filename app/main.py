@@ -20,4 +20,11 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Content Gen - Competitor Analysis Engine", lifespan=lifespan, dependencies=[Depends(verify_bearer_token)])
+
+
+@app.get("/health")
+async def health():
+    return {"ok": True}
+
+
 app.include_router(router, prefix="/api/v1")
