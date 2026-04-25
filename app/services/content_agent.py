@@ -42,18 +42,6 @@ TOOLS = [
         },
     },
     {
-        "name": "backlinks_overview",
-        "description": "Get backlink profile for a domain or page. Returns summary stats (total backlinks, referring domains, spam score) and trend data. Use this to assess link-building difficulty for a topic.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "target": {"type": "string", "description": "Domain or URL to analyze"},
-                "scope": {"type": "string", "enum": ["domain", "page"], "default": "domain"},
-            },
-            "required": ["target"],
-        },
-    },
-    {
         "name": "tavily_search",
         "description": "Search the web for current information about a topic. Use this to check content freshness, find recent developments, or verify facts.",
         "input_schema": {
@@ -91,17 +79,6 @@ async def _execute_tool(name: str, input_data: dict) -> str:
                  "keyword_difficulty": r.keyword_difficulty, "cpc": r.cpc, "intent": r.intent}
                 for r in results[:20]
             ])
-
-        elif name == "backlinks_overview":
-            result = await seo_client.backlinks_overview(
-                target=input_data["target"],
-                scope=input_data.get("scope", "domain"),
-            )
-            return json.dumps({
-                "target": result.target,
-                "summary": result.summary,
-                "top_backlinks": result.backlinks[:5],
-            })
 
         elif name == "tavily_search":
             from tavily import TavilyClient
@@ -181,8 +158,7 @@ For each of the top topic clusters, produce a detailed content brief and then wr
 **Process for each cluster:**
 1. Use `keyword_serp` to analyze the current top-ranking pages for the primary keyword
 2. Use `keyword_research` to find additional related keywords to target
-3. Use `backlinks_overview` on the top-ranking domains to understand link difficulty
-4. Use `tavily_search` to check for recent developments or angles competitors are missing
+3. Use `tavily_search` to check for recent developments or angles competitors are missing
 
 **Then produce for each cluster:**
 A complete content brief followed by the full article in markdown, including:
