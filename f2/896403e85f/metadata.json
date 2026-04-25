@@ -3,7 +3,7 @@
   "checkpoint_id": "f2896403e85f",
   "strategy": "manual-commit",
   "branch": "main",
-  "checkpoints_count": 2,
+  "checkpoints_count": 4,
   "files_touched": [
     "app/core/auth.py",
     "app/main.py",
@@ -15,13 +15,19 @@
       "transcript": "/f2/896403e85f/0/full.jsonl",
       "content_hash": "/f2/896403e85f/0/content_hash.txt",
       "prompt": "/f2/896403e85f/0/prompt.txt"
+    },
+    {
+      "metadata": "/f2/896403e85f/1/metadata.json",
+      "transcript": "/f2/896403e85f/1/full.jsonl",
+      "content_hash": "/f2/896403e85f/1/content_hash.txt",
+      "prompt": "/f2/896403e85f/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 311,
-    "cache_creation_tokens": 154836,
-    "cache_read_tokens": 17252354,
-    "output_tokens": 47675,
-    "api_call_count": 217
+    "input_tokens": 671,
+    "cache_creation_tokens": 206765,
+    "cache_read_tokens": 17425432,
+    "output_tokens": 50846,
+    "api_call_count": 226
   }
 }
