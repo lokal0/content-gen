@@ -13,9 +13,43 @@ from app.api.schemas import (
 from app.core.database import get_db
 from app.models.tables import Competitor, CrawledPage, Keyword, Submission
 from app.services.content_agent import run_content_agent
+from app.services.pioneer_finetuning import collect_training_samples
 from app.services.pipeline import run_pipeline
 
 router = APIRouter()
+
+
+@router.get("/intent-model/status")
+async def intent_model_status(db: AsyncSession = Depends(get_db)):
+    from app.services.pioneer_finetuning import get_training_sample_count, get_latest_trained_model, MIN_SAMPLES_TO_TRAIN
+    sample_count = await get_training_sample_count(db)
+    trained_model = await get_latest_trained_model()
+    return {
+        "training_samples": sample_count,
+        "min_samples_required": MIN_SAMPLES_TO_TRAIN,
+        "ready_to_train": sample_count >= MIN_SAMPLES_TO_TRAIN,
+        "active_model": trained_model or "fastino/gliner2-base-v1 (base)",
+    }
+
+
+@router.post("/intent-model/train")
+async def trigger_intent_training(db: AsyncSession = Depends(get_db)):
+    from app.services.pioneer_finetuning import maybe_finetune, get_training_sample_count, MIN_SAMPLES_TO_TRAIN
+    sample_count = await get_training_sample_count(db)
+    if sample_count < MIN_SAMPLES_TO_TRAIN:
+        return {
+            "status": "insufficient_data",
+            "training_samples": sample_count,
+            "min_required": MIN_SAMPLES_TO_TRAIN,
+        }
+    job_id = await maybe_finetune(db)
+    return {"status": "training_started" if job_id else "failed", "job_id": job_id}
+
+
+@router.get("/intent-model/training-job/{job_id}")
+async def check_training_job(job_id: str):
+    from app.services.pioneer_finetuning import check_finetuning_status
+    return await check_finetuning_status(job_id)
 
 
 @router.post("/analyze", response_model=AnalyzeResponse)
@@ -56,6 +90,9 @@ async def analyze_competitors(request: AnalyzeRequest, db: AsyncSession = Depend
                 method=kw_data["method"],
             )
             db.add(keyword_record)
+
+    # Collect training samples from DataForSEO intent labels for Pioneer fine-tuning
+    await collect_training_samples(result.all_keyword_metrics, db)
 
     # Phase 4-5: Agent produces content briefs and writes articles
     agent_result = await run_content_agent(result)

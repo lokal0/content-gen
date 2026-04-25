@@ -139,11 +139,17 @@ def _build_system_prompt(pipeline_result: PipelineResult) -> str:
             for url, cov in cluster.competitor_coverage.items()
             if cov > 0
         )
+        intent_breakdown = {}
+        for m in cluster.keyword_metrics:
+            intent = m.get("pioneer_intent", "unknown")
+            intent_breakdown[intent] = intent_breakdown.get(intent, 0) + 1
+        intent_str = ", ".join(f"{k}={v}" for k, v in intent_breakdown.items()) if intent_breakdown else "unclassified"
+
         clusters_summary.append(
             f"- Cluster #{cluster.id} (opportunity: {cluster.opportunity_score:.0f}): "
             f"{', '.join(cluster.keywords[:5])} | "
             f"vol={cluster.total_search_volume}, diff={cluster.avg_keyword_difficulty:.1f}, "
-            f"cpc=${cluster.avg_cpc:.2f} | coverage: {coverage or 'none'}"
+            f"cpc=${cluster.avg_cpc:.2f} | intents: {intent_str} | coverage: {coverage or 'none'}"
         )
 
     return f"""You are an expert SEO content strategist. You have analyzed 5 competitor websites and identified topic clusters ranked by opportunity.

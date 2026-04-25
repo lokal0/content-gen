@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     api_bearer_token: str = ""
     gemini_api_key: str = ""
     anthropic_api_key: str = ""
+    pioneer_api_key: str = ""
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

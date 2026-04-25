@@ -58,3 +58,13 @@ class Keyword(Base):
     method: Mapped[str] = mapped_column(String(50))
 
     competitor: Mapped["Competitor"] = relationship(back_populates="keywords")
+
+
+class IntentTrainingSample(Base):
+    __tablename__ = "intent_training_samples"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    keyword: Mapped[str] = mapped_column(String(512), index=True)
+    intent: Mapped[str] = mapped_column(String(50))
+    source: Mapped[str] = mapped_column(String(50))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

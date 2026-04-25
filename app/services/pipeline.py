@@ -5,6 +5,7 @@ from typing import Any
 
 from app.services import seo_client
 from app.services.crawler import CrawlResult, crawl_all_competitors
+from app.services.keyword_classifier import ClassifiedKeyword, classify_keywords
 from app.services.keyword_extractor import extract_all_keywords
 from app.services.topic_clustering import TopicCluster, build_topic_clusters
 
@@ -28,6 +29,7 @@ class PipelineResult:
     competitors: list[CompetitorProfile]
     topic_clusters: list[TopicCluster]
     all_keyword_metrics: dict[str, dict]
+    keyword_intents: dict[str, ClassifiedKeyword] = field(default_factory=dict)
     total_keywords_found: int = 0
     total_clusters: int = 0
 
@@ -125,6 +127,11 @@ async def run_pipeline(urls: list[str]) -> PipelineResult:
     keyword_metrics = await _enrich_keywords(all_keywords)
     logger.info("Got metrics for %d keywords", len(keyword_metrics))
 
+    # Phase 1e: Classify keyword intent with Pioneer GLiNER2
+    logger.info("Phase 1e: Classifying keyword intent with Pioneer")
+    keyword_intents = await classify_keywords(all_keywords)
+    logger.info("Classified %d keywords by intent", len(keyword_intents))
+
     # Phase 2: Topic clustering
     logger.info("Phase 2: Building topic clusters")
     keywords_to_cluster = [kw for kw in all_keywords if kw in keyword_metrics]
@@ -134,6 +141,7 @@ async def run_pipeline(urls: list[str]) -> PipelineResult:
         keywords=keywords_to_cluster,
         keyword_metrics=keyword_metrics,
         competitor_keywords=competitor_keywords,
+        keyword_intents=keyword_intents,
         min_cluster_size=3,
     )
     logger.info("Phase 2 complete: %d topic clusters", len(topic_clusters))
@@ -142,6 +150,7 @@ async def run_pipeline(urls: list[str]) -> PipelineResult:
         competitors=profiles,
         topic_clusters=topic_clusters,
         all_keyword_metrics=keyword_metrics,
+        keyword_intents=keyword_intents,
         total_keywords_found=len(all_keywords),
         total_clusters=len(topic_clusters),
     )

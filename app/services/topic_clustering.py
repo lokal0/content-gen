@@ -80,7 +80,10 @@ def score_clusters(
     clusters: list[TopicCluster],
     keyword_metrics: dict[str, dict],
     competitor_keywords: dict[str, set[str]],
+    keyword_intents: dict | None = None,
 ) -> list[TopicCluster]:
+    from app.services.keyword_classifier import INTENT_WEIGHTS
+
     competitor_urls = list(competitor_keywords.keys())
 
     for cluster in clusters:
@@ -88,6 +91,7 @@ def score_clusters(
         difficulties = []
         cpcs = []
         matched_metrics = []
+        intent_weights = []
 
         for kw in cluster.keywords:
             metrics = keyword_metrics.get(kw.lower())
@@ -100,6 +104,13 @@ def score_clusters(
                 difficulties.append(metrics["keywordDifficulty"])
             if metrics.get("cpc"):
                 cpcs.append(metrics["cpc"])
+
+            if keyword_intents and kw in keyword_intents:
+                classified = keyword_intents[kw]
+                metrics["pioneer_intent"] = classified.intent
+                intent_weights.append(classified.intent_weight)
+            else:
+                intent_weights.append(INTENT_WEIGHTS.get("informational", 1.0))
 
         cluster.keyword_metrics = matched_metrics
         cluster.total_search_volume = sum(volumes) if volumes else 0
@@ -114,9 +125,10 @@ def score_clusters(
         avg_coverage = np.mean(list(cluster.competitor_coverage.values())) if cluster.competitor_coverage else 0.0
         gap_factor = 1.0 - avg_coverage
         difficulty_factor = 1.0 - (cluster.avg_keyword_difficulty / 100.0) if cluster.avg_keyword_difficulty else 0.5
+        avg_intent_weight = float(np.mean(intent_weights)) if intent_weights else 1.0
 
         cluster.opportunity_score = (
-            cluster.total_search_volume * gap_factor * difficulty_factor
+            cluster.total_search_volume * gap_factor * difficulty_factor * avg_intent_weight
         )
 
     clusters.sort(key=lambda c: c.opportunity_score, reverse=True)
@@ -127,6 +139,7 @@ async def build_topic_clusters(
     keywords: list[str],
     keyword_metrics: dict[str, dict],
     competitor_keywords: dict[str, set[str]],
+    keyword_intents: dict | None = None,
     min_cluster_size: int = 3,
 ) -> list[TopicCluster]:
     if len(keywords) < min_cluster_size:
@@ -140,5 +153,5 @@ async def build_topic_clusters(
     clusters = cluster_keywords(keywords, embeddings, min_cluster_size)
     logger.info("Found %d topic clusters", len(clusters))
 
-    clusters = score_clusters(clusters, keyword_metrics, competitor_keywords)
+    clusters = score_clusters(clusters, keyword_metrics, competitor_keywords, keyword_intents)
     return clusters
