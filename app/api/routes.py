@@ -60,6 +60,83 @@ async def check_training_job(job_id: str):
     return await check_finetuning_status(job_id)
 
 
+@router.post("/discover-competitors")
+async def discover_competitors(request: dict):
+    from app.services import seo_client
+    from app.services.pipeline import _extract_domain
+
+    category = request.get("business_category", "")
+    location = request.get("business_location", "")
+    business_name = request.get("business_name", "")
+
+    if not category and not business_name:
+        return {"competitors": [], "error": "Provide business_category or business_name"}
+
+    seed_keywords = []
+    if category and location:
+        seed_keywords.append(f"{category} {location}")
+        seed_keywords.append(f"best {category} {location}")
+    elif category:
+        seed_keywords.append(f"best {category}")
+    elif business_name and location:
+        seed_keywords.append(f"{business_name} {location}")
+
+    skip_domains = {
+        "google.com", "yelp.com", "yelp.de", "tripadvisor.com", "facebook.com",
+        "instagram.com", "maps.google.com", "wikipedia.org", "youtube.com",
+        "twitter.com", "x.com", "linkedin.com", "pinterest.com", "tiktok.com",
+        "amazon.com", "ebay.com", "treatwell.de", "treatwell.com",
+        "booksy.com", "fresha.com", "squareup.com",
+    }
+    biz_name_lower = (business_name or "").lower()
+
+    seen_domains: dict[str, dict] = {}
+
+    for keyword in seed_keywords:
+        try:
+            serp_results = await seo_client.keyword_serp(keyword)
+            for hit in serp_results:
+                domain = hit.domain
+                if not domain or domain in skip_domains:
+                    continue
+                if biz_name_lower and biz_name_lower.replace(" ", "") in domain.replace(".", ""):
+                    continue
+                if domain not in seen_domains:
+                    seen_domains[domain] = {
+                        "domain": domain,
+                        "url": f"https://{domain}",
+                        "serp_appearances": 0,
+                        "best_rank": 100,
+                        "sample_title": hit.title,
+                    }
+                seen_domains[domain]["serp_appearances"] += 1
+                seen_domains[domain]["best_rank"] = min(seen_domains[domain]["best_rank"], hit.rank)
+        except Exception as e:
+            logger.warning("SERP lookup failed for %r: %s", keyword, e)
+
+    ranked = sorted(seen_domains.values(), key=lambda x: (-x["serp_appearances"], x["best_rank"]))
+
+    competitors = []
+    for comp in ranked[:5]:
+        overview = None
+        try:
+            overview = await seo_client.domain_overview(comp["domain"])
+        except Exception:
+            pass
+
+        competitors.append({
+            "domain": comp["domain"],
+            "url": comp["url"],
+            "title": comp["sample_title"],
+            "serp_appearances": comp["serp_appearances"],
+            "best_rank": comp["best_rank"],
+            "organic_traffic": overview.organic_traffic if overview else None,
+            "organic_keywords": overview.organic_keywords if overview else None,
+        })
+
+    return {"competitors": competitors, "seed_keywords": seed_keywords}
+
+
 async def _run_pipeline_task(
     job_id: uuid.UUID,
     competitor_urls: list[str],
