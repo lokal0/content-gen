@@ -86,53 +86,57 @@ async def discover_competitors(request: dict):
         "instagram.com", "maps.google.com", "wikipedia.org", "youtube.com",
         "twitter.com", "x.com", "linkedin.com", "pinterest.com", "tiktok.com",
         "amazon.com", "ebay.com", "treatwell.de", "treatwell.com",
-        "booksy.com", "fresha.com", "squareup.com",
+        "booksy.com", "fresha.com", "squareup.com", "reddit.com",
     }
     biz_name_lower = (business_name or "").lower()
 
     seen_domains: dict[str, dict] = {}
 
-    for keyword in seed_keywords:
+    # Fetch all SERP results in parallel
+    async def fetch_serp(keyword: str):
         try:
-            serp_results = await seo_client.keyword_serp(keyword)
-            for hit in serp_results:
-                domain = hit.domain
-                if not domain or domain in skip_domains:
-                    continue
-                if biz_name_lower and biz_name_lower.replace(" ", "") in domain.replace(".", ""):
-                    continue
-                if domain not in seen_domains:
-                    seen_domains[domain] = {
-                        "domain": domain,
-                        "url": f"https://{domain}",
-                        "serp_appearances": 0,
-                        "best_rank": 100,
-                        "sample_title": hit.title,
-                    }
-                seen_domains[domain]["serp_appearances"] += 1
-                seen_domains[domain]["best_rank"] = min(seen_domains[domain]["best_rank"], hit.rank)
+            return await seo_client.keyword_serp(keyword)
         except Exception as e:
             logger.warning("SERP lookup failed for %r: %s", keyword, e)
+            return []
+
+    serp_results_list = await asyncio.gather(*[fetch_serp(kw) for kw in seed_keywords])
+
+    for serp_results in serp_results_list:
+        for hit in serp_results:
+            domain = hit.domain
+            if not domain or domain in skip_domains:
+                continue
+            if domain.startswith("www."):
+                domain = domain[4:]
+            if biz_name_lower and biz_name_lower.replace(" ", "") in domain.replace(".", ""):
+                continue
+            if domain not in seen_domains:
+                seen_domains[domain] = {
+                    "domain": domain,
+                    "url": f"https://{domain}",
+                    "serp_appearances": 0,
+                    "best_rank": 100,
+                    "sample_title": hit.title,
+                }
+            seen_domains[domain]["serp_appearances"] += 1
+            seen_domains[domain]["best_rank"] = min(seen_domains[domain]["best_rank"], hit.rank)
 
     ranked = sorted(seen_domains.values(), key=lambda x: (-x["serp_appearances"], x["best_rank"]))
+    top5 = ranked[:5]
 
-    competitors = []
-    for comp in ranked[:5]:
-        overview = None
+    # Fetch domain overviews in parallel
+    async def enrich(comp: dict):
         try:
             overview = await seo_client.domain_overview(comp["domain"])
+            comp["organic_traffic"] = overview.organic_traffic
+            comp["organic_keywords"] = overview.organic_keywords
         except Exception:
-            pass
+            comp["organic_traffic"] = None
+            comp["organic_keywords"] = None
+        return comp
 
-        competitors.append({
-            "domain": comp["domain"],
-            "url": comp["url"],
-            "title": comp["sample_title"],
-            "serp_appearances": comp["serp_appearances"],
-            "best_rank": comp["best_rank"],
-            "organic_traffic": overview.organic_traffic if overview else None,
-            "organic_keywords": overview.organic_keywords if overview else None,
-        })
+    competitors = await asyncio.gather(*[enrich(comp) for comp in top5])
 
     return {"competitors": competitors, "seed_keywords": seed_keywords}
 
