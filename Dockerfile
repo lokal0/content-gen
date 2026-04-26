@@ -24,6 +24,9 @@ ENV PATH="/app/.venv/bin:$PATH"
 
 RUN python -c "import nltk; nltk.download('stopwords', quiet=True); nltk.download('punkt_tab', quiet=True)"
 
+RUN useradd -r -u 1001 appuser && chown -R appuser:appuser /app
+USER appuser
+
 EXPOSE 8000
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
