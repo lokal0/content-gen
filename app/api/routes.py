@@ -30,13 +30,64 @@ router = APIRouter()
 @router.get("/intent-model/status")
 async def intent_model_status(db: AsyncSession = Depends(get_db)):
     from app.services.pioneer_finetuning import get_training_sample_count, get_latest_trained_model, MIN_SAMPLES_TO_TRAIN
+    from app.models.tables import IntentTrainingSample
+    from sqlalchemy import func, select, desc
+
     sample_count = await get_training_sample_count(db)
     trained_model = await get_latest_trained_model()
+
+    # Intent distribution
+    dist_result = await db.execute(
+        select(IntentTrainingSample.intent, func.count(IntentTrainingSample.id))
+        .group_by(IntentTrainingSample.intent)
+    )
+    intent_distribution = {row[0]: row[1] for row in dist_result.all()}
+
+    # Recent samples
+    recent_result = await db.execute(
+        select(IntentTrainingSample)
+        .order_by(desc(IntentTrainingSample.created_at))
+        .limit(10)
+    )
+    recent_samples = [
+        {
+            "keyword": s.keyword,
+            "intent": s.intent,
+            "source": s.source,
+            "created_at": s.created_at.isoformat() if s.created_at else None,
+        }
+        for s in recent_result.scalars().all()
+    ]
+
+    # Samples over time (grouped by day)
+    timeline_result = await db.execute(
+        select(
+            func.date_trunc("day", IntentTrainingSample.created_at).label("day"),
+            func.count(IntentTrainingSample.id).label("count"),
+        )
+        .group_by("day")
+        .order_by("day")
+    )
+    timeline = [
+        {"date": row.day.isoformat() if row.day else None, "count": row.count}
+        for row in timeline_result.all()
+    ]
+
+    progress_pct = min(100, round(sample_count / MIN_SAMPLES_TO_TRAIN * 100))
+    samples_remaining = max(0, MIN_SAMPLES_TO_TRAIN - sample_count)
+
     return {
         "training_samples": sample_count,
         "min_samples_required": MIN_SAMPLES_TO_TRAIN,
+        "samples_remaining": samples_remaining,
+        "progress_pct": progress_pct,
         "ready_to_train": sample_count >= MIN_SAMPLES_TO_TRAIN,
-        "active_model": trained_model or "fastino/gliner2-base-v1 (base)",
+        "active_model": trained_model or None,
+        "base_model": "fastino/gliner2-base-v1",
+        "is_fine_tuned": trained_model is not None,
+        "intent_distribution": intent_distribution,
+        "recent_samples": recent_samples,
+        "timeline": timeline,
     }
 
 
