@@ -232,6 +232,49 @@ docker compose up -d   # pgvector + seo-api
 uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
+## Vision
+
+```
+Phase 1 — NOW                    Phase 2                         Phase 3
++-----------------------+        +-----------------------+       +-----------------------+
+| One-shot analysis     |        | Continuous monitoring  |       | Multi-location intel  |
+|                       |        |                       |       |                       |
+| Google Maps URL       |        | Weekly re-audits      |       | Franchise dashboard   |
+|   -> competitors      |   -->  | Competitor alerts     |  -->  | Cross-city insights   |
+|   -> keyword gaps     |        | Auto-response content |       | "Munich outranks      |
+|   -> published content|        | Rank tracking         |       |  Berlin for X — copy" |
++-----------------------+        +-----------------------+       +-----------------------+
+
+Phase 4                          Phase 5
++-----------------------+        +-----------------------+
+| Intent model API      |        | Local search engine   |
+|                       |        |                       |
+| "What do people in    |        | Reverse the flow:     |
+|  Berlin search for    |   -->  | help customers find   |
+|  in category X?"      |        | businesses, powered   |
+|                       |        | by the content and    |
+| Trained on every      |        | intelligence we built |
+| market we've analyzed |        |                       |
++-----------------------+        +-----------------------+
+```
+
+### Phase 1: Content Intelligence (now)
+One Google Maps link triggers a full competitive analysis. The platform crawls competitors, discovers keyword gaps, generates SEO-optimized content, and publishes it as a live web presence. Every run trains the intent model.
+
+### Phase 2: Continuous Monitoring
+Weekly re-audits detect when competitors publish new content or rank for new keywords. The platform auto-generates response articles to maintain coverage. Businesses get alerts: "Competitor X just started ranking for Y — we've drafted content to counter it."
+
+### Phase 3: Multi-Location Intelligence
+Franchise and multi-location businesses see a unified dashboard. The platform identifies which locations outperform others and why. "Your Munich branch ranks for 40 keywords your Berlin branch doesn't — here's the content to close the gap."
+
+### Phase 4: Intent Model API
+The Pioneer fine-tuning loop produces a model that understands local search intent across cities and categories. This becomes an API: "What do people in Berlin search for when looking for a barbershop?" Other tools and platforms query it. The model improves with every market analyzed — a genuine data moat.
+
+### Phase 5: Local Search Engine
+Reverse the flow. Instead of businesses finding customers, help customers find businesses. Every article we publish is training data. Every market we analyze is a node in the graph. The platform becomes the local search layer — not replacing Google, but understanding local markets better than Google does for niche queries.
+
+**Lokal starts as a tool. Becomes a platform. Ends as infrastructure.**
+
 ## Related Repos
 
 - [lokal-next](https://github.com/aadilghani1/lokal-next) — Frontend (Next.js 16, Clerk, shadcn/ui, AI Elements)
