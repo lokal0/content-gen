@@ -89,7 +89,8 @@ async def _classify_one(
         )
 
 
-async def classify_keywords(keywords: list[str]) -> dict[str, ClassifiedKeyword]:
+async def classify_keywords(keywords: list[str], job_id: "uuid.UUID | None" = None) -> dict[str, ClassifiedKeyword]:
+    import uuid
     if not keywords:
         return {}
 
@@ -116,5 +117,14 @@ async def classify_keywords(keywords: list[str]) -> dict[str, ClassifiedKeyword]
     for r in results:
         intent_counts[r.intent] = intent_counts.get(r.intent, 0) + 1
     logger.info("Classification complete: %s", intent_counts)
+
+    if job_id:
+        from app.services.event_bus import emit
+        for r in results[:10]:
+            await emit(job_id, "intent_classified", {
+                "keyword": r.keyword,
+                "intent": r.intent,
+                "weight": r.intent_weight,
+            })
 
     return classified

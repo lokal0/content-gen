@@ -316,7 +316,7 @@ async def run_pipeline(
         await progress("classifying_intent", f"Using cached intent for {len(keyword_intents)} keywords")
     else:
         await progress("classifying_intent", f"Classifying {len(keywords_to_enrich)} keywords")
-        keyword_intents = await classify_keywords(keywords_to_enrich)
+        keyword_intents = await classify_keywords(keywords_to_enrich, job_id=job_id)
         save_stage("keyword_intents", keyword_intents)
         await progress("classifying_intent", f"Classified {len(keyword_intents)} keywords by intent")
 

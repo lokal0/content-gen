@@ -387,12 +387,18 @@ async def _run_pipeline_task(
             "ranked_keywords_count": len(result.business.ranked_keywords),
         }
 
+        keyword_intents_out = {
+            kw: {"intent": ci.intent, "weight": ci.intent_weight}
+            for kw, ci in result.keyword_intents.items()
+        } if result.keyword_intents else {}
+
         result_json = {
             "business": business_out,
             "total_keywords_found": result.total_keywords_found,
             "total_clusters": result.total_clusters,
             "competitors": competitors_out,
             "topic_clusters": clusters_out,
+            "keyword_intents": keyword_intents_out,
             "content": content_out,
         }
 
