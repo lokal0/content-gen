@@ -224,6 +224,13 @@ async def run_pipeline(
     location_code, language_code = await seo_client.resolve_location(city, country_code)
     logger.info("Pipeline geo: %s (%s) → code=%d, lang=%s", city, country_code, location_code, language_code)
 
+    # Country-level code for keyword_overview/research (don't support city-level)
+    COUNTRY_LOCATION_CODES = {
+        "DE": 2276, "AT": 2040, "CH": 2756, "FR": 2250, "ES": 2724,
+        "IT": 2380, "GB": 2826, "US": 2840, "TR": 2792, "NL": 2528,
+    }
+    country_location_code = COUNTRY_LOCATION_CODES.get(country_code.upper(), 2840)
+
     if not competitor_urls:
         await progress("discovering_competitors", f"Searching for competitors of {business_name or 'business'}")
         competitor_urls = await _discover_competitors(
@@ -298,7 +305,7 @@ async def run_pipeline(
         await progress("enriching_keywords", f"Using cached metrics for {len(keyword_metrics)} keywords")
     else:
         await progress("enriching_keywords", f"Enriching top {len(keywords_to_enrich)} keywords with search metrics")
-        keyword_metrics = await _enrich_keywords(keywords_to_enrich, location_code=location_code, language_code=language_code)
+        keyword_metrics = await _enrich_keywords(keywords_to_enrich, location_code=country_location_code, language_code=language_code)
         save_stage("keyword_metrics", keyword_metrics)
         await progress("enriching_keywords", f"Got metrics for {len(keyword_metrics)} keywords")
 

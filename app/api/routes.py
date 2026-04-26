@@ -99,9 +99,16 @@ async def discover_competitors(request: dict):
                     city = cleaned
                     break
 
-    # Resolve city-level location code via DataForSEO locations API
+    # Resolve city-level location code for SERP (city-specific results)
     location_code, language_code = await seo_client.resolve_location(city, country_code)
     logger.info("Resolved location: %s (%s) → code=%d, lang=%s", city, country_code, location_code, language_code)
+
+    # Country-level code for keyword_research (doesn't support city-level)
+    COUNTRY_LOCATION_CODES = {
+        "DE": 2276, "AT": 2040, "CH": 2756, "FR": 2250, "ES": 2724,
+        "IT": 2380, "GB": 2826, "US": 2840, "TR": 2792, "NL": 2528,
+    }
+    country_location_code = COUNTRY_LOCATION_CODES.get(country_code.upper(), 2840)
 
     # Step 1: Use keyword_research to discover what people actually search
     initial_seed = f"{category} {city}" if category and city else f"{business_name} {city}" if business_name and city else category or business_name
@@ -109,7 +116,7 @@ async def discover_competitors(request: dict):
     discovered_keywords = []
 
     try:
-        kw_results = await seo_client.keyword_research([initial_seed], location_code=location_code, language_code=language_code)
+        kw_results = await seo_client.keyword_research([initial_seed], location_code=country_location_code, language_code=language_code)
         # Pick top keywords by volume that include the city or category
         city_lower = city.lower() if city else ""
         cat_lower = category.lower() if category else ""
