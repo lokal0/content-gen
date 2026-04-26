@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: contentgen
       POSTGRES_PASSWORD: contentgen
@@ -9,6 +9,21 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U contentgen"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  seo-api:
+    build: ../seo-api
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: "3000"
+      DATAFORSEO_API_KEY: ${DATAFORSEO_API_KEY:-}
+    depends_on:
+      - postgres
 
 volumes:
   pgdata:

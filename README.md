@@ -194,10 +194,50 @@ One input (Google Maps URL) triggers a 12-stage pipeline: competitive analysis, 
 
 ## Setup
 
+### Prerequisites
+
+- Python 3.14+ with [uv](https://docs.astral.sh/uv/)
+- Docker (for local Postgres + seo-api)
+- API keys: Tavily, Gemini, Anthropic, Pioneer (see `.env.example`)
+
+### Quick Start
+
 ```bash
+# 1. Clone with seo-api sibling
+git clone https://github.com/lokal0/content-gen.git
+git clone https://github.com/lokal0/seo-api.git
+
+# 2. Install Python dependencies
+cd content-gen
 uv sync
+
+# 3. Configure environment
 cp .env.example .env
+# Edit .env with your API keys
+
+# 4. Start Postgres (pgvector) + seo-api
+docker compose up -d
+
+# 5. Run the engine
 uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+The engine starts at `http://localhost:8000`. API docs at `/docs`.
+
+### Without Docker (using Neon)
+
+If using Neon Postgres instead of local Docker:
+
+```bash
+# Set DATABASE_URL to your Neon connection string in .env
+# The app auto-converts postgresql:// to postgresql+asyncpg://
+# and handles sslmode -> ssl parameter conversion
+
+# Run seo-api separately
+cd ../seo-api && npm install && npm run build && npm start &
+
+# Run content-gen
+cd ../content-gen && uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
 ## Related Repos
