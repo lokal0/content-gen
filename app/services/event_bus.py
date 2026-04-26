@@ -31,10 +31,25 @@ async def emit_stage(job_id: uuid.UUID, stage: str, detail: str | None = None):
 
 
 async def emit_tool_call(job_id: uuid.UUID, name: str, input_data: dict, output: str | None = None):
+    import json as _json
+
+    # Try to send parsed output so frontend can render structured data
+    parsed_output = None
+    if output:
+        try:
+            parsed = _json.loads(output)
+            if isinstance(parsed, list):
+                parsed_output = parsed[:5]
+            elif isinstance(parsed, dict):
+                parsed_output = parsed
+        except (ValueError, TypeError):
+            pass
+
     await emit(job_id, "tool_call", {
         "name": name,
         "input": input_data,
         "output_preview": (output or "")[:500],
+        "output_parsed": parsed_output,
     })
 
 
