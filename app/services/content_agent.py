@@ -204,6 +204,7 @@ class ContentPiece:
     content_type: str = ""
     competitive_angle: str = ""
     article_markdown: str = ""
+    embedding: list[float] | None = None
 
 
 @dataclass
@@ -353,6 +354,22 @@ async def run_content_agent(pipeline_result: PipelineResult, job_id: "uuid.UUID 
             await update_progress(job_id, "agent_writing", "Structuring articles...")
         agent_result.articles = await _structure_articles(client, agent_result.full_response)
         logger.info("Structured %d articles from agent output", len(agent_result.articles))
+
+        # Embed each article with Gemini for semantic search / similarity
+        if agent_result.articles:
+            try:
+                from app.services.topic_clustering import embed_keywords
+                texts_to_embed = [
+                    f"{a.meta_title} {a.target_keyword} {a.article_markdown[:500]}"
+                    for a in agent_result.articles
+                ]
+                embeddings = await embed_keywords(texts_to_embed)
+                for i, a in enumerate(agent_result.articles):
+                    if i < len(embeddings):
+                        a.embedding = embeddings[i].tolist()
+                logger.info("Embedded %d articles with Gemini", len(agent_result.articles))
+            except Exception as e:
+                logger.warning("Article embedding failed: %s", e)
 
         if job_id:
             for a in agent_result.articles:

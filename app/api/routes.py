@@ -306,6 +306,7 @@ async def _run_pipeline_task(
                 "competitive_angle": a.competitive_angle,
                 "article_markdown": a.article_markdown,
                 "schema_jsonld": schemas,
+                "embedding": a.embedding,
             })
 
         content_out = {
