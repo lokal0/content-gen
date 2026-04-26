@@ -1,0 +1,46 @@
+{
+  "cli_version": "0.5.6",
+  "checkpoint_id": "bdde24ed269b",
+  "session_id": "560d831f-4ad6-4aab-b7f2-14cd3fcb9ae2",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-26T09:57:09.581676Z",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "app/services/topic_clustering.py"
+  ],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "292022a7ccd9",
+  "token_usage": {
+    "input_tokens": 1869,
+    "cache_creation_tokens": 5604157,
+    "cache_read_tokens": 502811167,
+    "output_tokens": 307005,
+    "api_call_count": 1181
+  },
+  "session_metrics": {
+    "turn_count": 106
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-26T09:57:09.379642Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 7,
+    "human_modified": 7,
+    "human_removed": 0,
+    "total_committed": 7,
+    "total_lines_changed": 14,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}

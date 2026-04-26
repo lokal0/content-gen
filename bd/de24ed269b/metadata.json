@@ -1,0 +1,25 @@
+{
+  "cli_version": "0.5.6",
+  "checkpoint_id": "bdde24ed269b",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "app/services/topic_clustering.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/bd/de24ed269b/0/metadata.json",
+      "transcript": "/bd/de24ed269b/0/full.jsonl",
+      "content_hash": "/bd/de24ed269b/0/content_hash.txt",
+      "prompt": "/bd/de24ed269b/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 1869,
+    "cache_creation_tokens": 5604157,
+    "cache_read_tokens": 502811167,
+    "output_tokens": 307005,
+    "api_call_count": 1181
+  }
+}
