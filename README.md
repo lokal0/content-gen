@@ -267,13 +267,13 @@ Weekly re-audits detect when competitors publish new content or rank for new key
 ### Phase 3: Multi-Location Intelligence
 Franchise and multi-location businesses see a unified dashboard. The platform identifies which locations outperform others and why. "Your Munich branch ranks for 40 keywords your Berlin branch doesn't — here's the content to close the gap."
 
-### Phase 4: Intent Model API
+### Phase 4: Intent Model API — The Data Moat
 The Pioneer fine-tuning loop produces a model that understands local search intent across cities and categories. This becomes an API: "What do people in Berlin search for when looking for a barbershop?" Other tools and platforms query it. The model improves with every market analyzed — a genuine data moat.
 
-### Phase 5: Local Search Engine
-Reverse the flow. Instead of businesses finding customers, help customers find businesses. Every article we publish is training data. Every market we analyze is a node in the graph. The platform becomes the local search layer — not replacing Google, but understanding local markets better than Google does for niche queries.
+### Phase 5: Local Search Provider for LLMs and Agents
+As search shifts from Google to LLMs and AI agents, local businesses need to be findable by machines, not just humans. Every article Lokal publishes is structured data — Schema.org markup, semantic embeddings, intent-classified keywords — purpose-built for both traditional search engines and generative AI. The platform becomes the authoritative local data layer that LLMs and autonomous agents query when answering "find me a barbershop in Berlin" or "book a dentist near me." We're not building a search engine. We're building the local knowledge infrastructure that every search engine — traditional and generative — relies on.
 
-**Lokal starts as a tool. Becomes a platform. Ends as infrastructure.**
+**Lokal starts as a tool. Becomes a platform. Ends as the local search intelligence layer for the age of AI agents.**
 
 ## Related Repos
 
