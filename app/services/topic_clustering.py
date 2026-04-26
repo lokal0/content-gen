@@ -74,13 +74,20 @@ def cluster_keywords(
     embeddings: np.ndarray,
     min_cluster_size: int = 3,
 ) -> list[TopicCluster]:
-    clusterer = hdbscan.HDBSCAN(
-        min_cluster_size=min_cluster_size,
-        min_samples=2,
-        metric="euclidean",
-        cluster_selection_method="eom",
-    )
-    labels = clusterer.fit_predict(embeddings)
+    actual_min_samples = min(2, len(keywords) - 1) if len(keywords) > 1 else 1
+    actual_min_cluster = min(min_cluster_size, max(2, len(keywords) // 3))
+
+    try:
+        clusterer = hdbscan.HDBSCAN(
+            min_cluster_size=actual_min_cluster,
+            min_samples=actual_min_samples,
+            metric="euclidean",
+            cluster_selection_method="eom",
+        )
+        labels = clusterer.fit_predict(embeddings)
+    except Exception as e:
+        logger.warning("HDBSCAN failed (%s), skipping clustering", e)
+        return []
 
     clusters: dict[int, TopicCluster] = {}
     for idx, label in enumerate(labels):
