@@ -10,20 +10,126 @@ Billions of local searches happen on Google daily. Businesses that show up win. 
 
 One input (Google Maps URL) triggers a 12-stage pipeline: competitive analysis, keyword research, intent classification, topic clustering, AI content generation, and a published SEO-optimized web presence.
 
-## Pipeline (12 stages)
+## Pipeline
 
-1. **Business Extraction** — Google Places API (name, category, location, rating, reviews, photos)
-2. **Competitor Discovery** — DataForSEO keyword_research for real search terms, then SERP analysis with city-level geo (Berlin = code 1003854)
-3. **Site Crawling** — Tavily (depth 3, 20 pages per competitor)
-4. **Keyword Extraction** — TF-IDF + RAKE from crawled content
-5. **Keyword Enrichment** — DataForSEO bulk lookup (volume, difficulty, CPC)
-6. **Intent Classification** — Pioneer GLiNER2 with auto fine-tuning loop
-7. **Embedding** — Gemini Embedding 2.0 (768-dim)
-8. **Topic Clustering** — HDBSCAN with opportunity scoring
-9. **Content Agent** — Claude Sonnet 4.6, adaptive thinking, 3 tools, SSE streaming
-10. **Structured Output** — Pydantic via Anthropic messages.parse()
-11. **Schema.org JSON-LD** — Deterministic Article + LocalBusiness markup
-12. **Article Embedding** — Gemini + pgvector for similarity search
+```
+                         Google Maps URL
+                              |
+                    +---------+---------+
+                    |   Places API      |
+                    |   name, category  |
+                    |   location, rating|
+                    |   reviews, photos |
+                    +---------+---------+
+                              |
+              +---------------+---------------+
+              |                               |
+   +----------+----------+       +-----------+-----------+
+   | keyword_research()  |       | keyword_serp()        |
+   | "Salon Berlin"      |       | per discovered keyword|
+   | -> real search terms|       | -> who ranks on Google|
+   +----------+----------+       +-----------+-----------+
+              |                               |
+              +--------> COMPETITORS <--------+
+                         (SERP-based,
+                          city-level geo:
+                          Berlin = 1003854)
+                              |
+                    +---------+---------+
+                    |  Tavily Crawl     |
+                    |  depth 3          |
+                    |  20 pages/site    |
+                    |  x5 competitors   |
+                    +---------+---------+
+                              |
+              +---------------+---------------+
+              |                               |
+   +----------+----------+       +-----------+-----------+
+   | TF-IDF              |       | RAKE                  |
+   | cross-doc scoring   |       | multi-word phrases    |
+   | ngram (1,3)         |       | max_length=4          |
+   +----------+----------+       +-----------+-----------+
+              |                               |
+              +-----> MERGED KEYWORDS <-------+
+                      (top 50 selected)
+                              |
+              +---------------+---------------+
+              |               |               |
+   +----------+--+  +---------+---+  +--------+--------+
+   | DataForSEO  |  | Pioneer     |  | Gemini          |
+   | volume      |  | GLiNER2     |  | Embedding 2.0   |
+   | difficulty   |  | intent      |  | 768-dim vectors |
+   | CPC         |  | classify    |  |                 |
+   +----------+--+  +---------+---+  +--------+--------+
+              |               |               |
+              +-------+-------+-------+-------+
+                      |               |
+               +------+------+  +-----+------+
+               | Opportunity |  | HDBSCAN    |
+               | Scoring     |  | Clustering |
+               | vol x gap x |  | semantic   |
+               | diff x      |  | topic      |
+               | intent x    |  | groups     |
+               | novelty     |  |            |
+               +------+------+  +-----+------+
+                      |               |
+                      +-------+-------+
+                              |
+                    +---------+---------+
+                    |  Claude Agent     |
+                    |  Sonnet 4.6       |
+                    |  adaptive thinking|
+                    |                   |
+                    |  Tools:           |
+                    |   keyword_serp    |
+                    |   keyword_research|
+                    |   tavily_search   |
+                    |                   |
+                    |  SSE streaming    |
+                    |  stage/tool_call/ |
+                    |  thinking/text/   |
+                    |  article/complete |
+                    +---------+---------+
+                              |
+              +---------------+---------------+
+              |               |               |
+   +----------+--+  +---------+---+  +--------+--------+
+   | Pydantic    |  | Schema.org  |  | Gemini          |
+   | Structured  |  | JSON-LD     |  | Article         |
+   | Output via  |  | Article +   |  | Embedding       |
+   | messages.   |  | LocalBiz    |  | -> pgvector     |
+   | parse()     |  | + Rating    |  | -> similarity   |
+   +----------+--+  +---------+---+  +--------+--------+
+              |               |               |
+              +-------+-------+-------+-------+
+                              |
+                    +---------+---------+
+                    | Published Article |
+                    | {biz}.lokal0.app  |
+                    |                   |
+                    | - SEO content     |
+                    | - Real photos     |
+                    | - Schema markup   |
+                    | - Related articles|
+                    +-------------------+
+```
+
+### Stage Details
+
+| # | Stage | Service | Output |
+|---|-------|---------|--------|
+| 1 | Business Extraction | Google Places API | name, category, location, rating, reviews, photos |
+| 2 | Competitor Discovery | DataForSEO SERP | top 5 competitor domains (city-level geo) |
+| 3 | Site Crawling | Tavily | markdown content, headings, metadata per page |
+| 4 | Keyword Extraction | TF-IDF + RAKE | merged, deduped keyword list |
+| 5 | Keyword Enrichment | DataForSEO | search volume, difficulty, CPC per keyword |
+| 6 | Intent Classification | Pioneer GLiNER2 | informational / transactional / commercial / navigational |
+| 7 | Embedding | Gemini 2.0 | 768-dim vectors for clustering |
+| 8 | Topic Clustering | HDBSCAN | semantic keyword groups with opportunity scores |
+| 9 | Content Agent | Claude Sonnet 4.6 | researched, written SEO articles |
+| 10 | Structured Output | Anthropic API | typed article fields (keyword, meta, markdown) |
+| 11 | Schema.org | Deterministic | Article + LocalBusiness JSON-LD |
+| 12 | Article Embedding | Gemini + pgvector | similarity search for related articles |
 
 ## Partner Technologies
 
@@ -33,6 +139,33 @@ One input (Google Maps URL) triggers a 12-stage pipeline: competitive analysis, 
 | **Google Gemini** | Embedding 2.0 (768-dim) for keyword clustering (HDBSCAN) and article similarity (pgvector cosine distance). Batched with retry + backoff. |
 | **Tavily** | Site crawling (depth 3, 20 pages) and agent web search tool for trends/freshness. |
 | **Entire** | Developer platform for agent-human collaboration. |
+
+## Pioneer Fine-Tuning Loop
+
+```
+  Every pipeline run:
+  +------------------+     +------------------+     +------------------+
+  | DataForSEO       | --> | Collect training | --> | Store in DB      |
+  | returns intent   |     | samples (keyword |     | (intent_training |
+  | labels per       |     | + intent pairs)  |     | _samples table)  |
+  | keyword          |     |                  |     |                  |
+  +------------------+     +------------------+     +--------+---------+
+                                                             |
+  Daily cron (24h):                                          |
+  +------------------+     +------------------+     +--------+---------+
+  | Pioneer API      | <-- | Upload JSONL     | <-- | >= 50 samples?   |
+  | LORA fine-tune   |     | dataset          |     | Check count      |
+  | 10 epochs        |     |                  |     |                  |
+  | 5e-5 LR          |     |                  |     |                  |
+  +--------+---------+     +------------------+     +------------------+
+           |
+  Next pipeline run:
+  +--------+---------+     +------------------+
+  | Auto-detect      | --> | Use fine-tuned   |
+  | fine-tuned model |     | model for intent |
+  | via Pioneer API  |     | classification   |
+  +------------------+     +------------------+
+```
 
 ## What Makes It Different
 
