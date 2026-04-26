@@ -200,44 +200,36 @@ One input (Google Maps URL) triggers a 12-stage pipeline: competitive analysis, 
 - Docker (for local Postgres + seo-api)
 - API keys: Tavily, Gemini, Anthropic, Pioneer (see `.env.example`)
 
-### Quick Start
+### One Command Start (all 3 services)
 
 ```bash
-# 1. Clone with seo-api sibling
+# Clone all repos
 git clone https://github.com/lokal0/content-gen.git
 git clone https://github.com/lokal0/seo-api.git
+git clone https://github.com/aadilghani1/lokal-next.git
 
-# 2. Install Python dependencies
-cd content-gen
-uv sync
+# Copy orchestration files to parent dir
+cp content-gen/docker-compose.root.yml docker-compose.yml
+cp content-gen/.env.root.example .env
+cp content-gen/start.sh start.sh && chmod +x start.sh
 
-# 3. Configure environment
-cp .env.example .env
-# Edit .env with your API keys
-
-# 4. Start Postgres (pgvector) + seo-api
-docker compose up -d
-
-# 5. Run the engine
-uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
+# Edit .env with your API keys, then:
+./start.sh
 ```
 
-The engine starts at `http://localhost:8000`. API docs at `/docs`.
+This builds and starts all three services:
+- **Frontend** → http://localhost:3001
+- **Content API** → http://localhost:8000/docs
+- **SEO API** → http://localhost:3000
 
-### Without Docker (using Neon)
-
-If using Neon Postgres instead of local Docker:
+### Manual Start (content-gen only)
 
 ```bash
-# Set DATABASE_URL to your Neon connection string in .env
-# The app auto-converts postgresql:// to postgresql+asyncpg://
-# and handles sslmode -> ssl parameter conversion
-
-# Run seo-api separately
-cd ../seo-api && npm install && npm run build && npm start &
-
-# Run content-gen
-cd ../content-gen && uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
+cd content-gen
+uv sync
+cp .env.example .env   # fill in API keys
+docker compose up -d   # pgvector + seo-api
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
 ## Related Repos

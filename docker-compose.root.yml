@@ -1,0 +1,48 @@
+services:
+  seo-api:
+    build: ./seo-api
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: "3000"
+      DATAFORSEO_API_KEY: "${DATAFORSEO_API_KEY}"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  content-gen:
+    build: ./content-gen
+    ports:
+      - "8000:8000"
+    environment:
+      PORT: "8000"
+      SEO_API_URL: "http://seo-api:3000"
+      DATABASE_URL: "${DATABASE_URL}"
+      TAVILY_API_KEY: "${TAVILY_API_KEY}"
+      GEMINI_API_KEY: "${GEMINI_API_KEY}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY}"
+      PIONEER_API_KEY: "${PIONEER_API_KEY}"
+    depends_on:
+      seo-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  lokal-next:
+    build: ./lokal-next
+    ports:
+      - "3001:3000"
+    environment:
+      DATABASE_URL: "${LOKAL_DATABASE_URL}"
+      TAVILY_API_KEY: "${TAVILY_API_KEY}"
+      CONTENT_GEN_URL: "http://content-gen:8000"
+      CONTENT_GEN_TOKEN: ""
+      NEXT_PUBLIC_BLOG_DOMAIN: "localhost:3001"
+    depends_on:
+      content-gen:
+        condition: service_healthy
